@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/api_service.dart';
 
@@ -35,6 +36,7 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
   late AnimationController _reactionPopController;
   late Animation<double> _reactionPopScale;
   bool _showReactionBar = false;
+  bool _bookmarked = false;
 
   @override
   void initState() {
@@ -513,7 +515,14 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
 
                 // Share
                 GestureDetector(
-                  onTap: () {},
+                  onTap: () {
+                    final id = _postId;
+                    final content = post.content as String? ?? '';
+                    final text = content.isNotEmpty ? content : 'Check out this post on PartyPeople!';
+                    Share.share(id != null && id.isNotEmpty
+                        ? '$text\nhttps://partypeople.app/feed/$id'
+                        : text);
+                  },
                   child: HugeIcon(
                     icon: HugeIcons.strokeRoundedShare01,
                     size: 20,
@@ -525,11 +534,20 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
 
                 // Bookmark
                 GestureDetector(
-                  onTap: () {},
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _bookmarked = !_bookmarked);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(_bookmarked ? 'Post saved!' : 'Post removed from saved'),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ));
+                  },
                   child: HugeIcon(
-                    icon: HugeIcons.strokeRoundedBookmark01,
+                    icon: _bookmarked ? HugeIcons.strokeRoundedBookmark02 : HugeIcons.strokeRoundedBookmark01,
                     size: 20,
-                    color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                    color: _bookmarked ? AppColors.purple : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
                   ),
                 ),
               ],
