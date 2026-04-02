@@ -1583,6 +1583,12 @@ class _SettingsTabState extends State<_SettingsTab> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
+
+    // No venue yet — show creation form
+    if (_venueId == null) return _NoVenueWidget(isDark: isDark, onCreated: (id) {
+      setState(() => _venueId = id);
+    });
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -2049,3 +2055,161 @@ const _topSongs = [
   ('Midnight', 'Bien', 11),
   ('Sawa Sawa', 'Arrow Bwoy', 9),
 ];
+
+// ── No Venue Widget ───────────────────────────────────────────────────────────
+class _NoVenueWidget extends StatefulWidget {
+  final bool isDark;
+  final void Function(String venueId) onCreated;
+  const _NoVenueWidget({required this.isDark, required this.onCreated});
+
+  @override
+  State<_NoVenueWidget> createState() => _NoVenueWidgetState();
+}
+
+class _NoVenueWidgetState extends State<_NoVenueWidget> {
+  final _nameCtrl     = TextEditingController();
+  final _addressCtrl  = TextEditingController();
+  final _areaCtrl     = TextEditingController();
+  final _phoneCtrl    = TextEditingController();
+  final _capacityCtrl = TextEditingController();
+  String _category = 'Club';
+  bool _creating = false;
+  static const _categories = ['Club', 'Bar', 'Rooftop', 'Lounge', 'Restaurant', 'Events Venue'];
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose(); _addressCtrl.dispose(); _areaCtrl.dispose();
+    _phoneCtrl.dispose(); _capacityCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _create() async {
+    if (_nameCtrl.text.trim().isEmpty || _addressCtrl.text.trim().isEmpty || _capacityCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Name, address and capacity are required'),
+        backgroundColor: AppColors.red, behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _creating = true);
+    try {
+      final res = await ApiService().createVenue({
+        'name': _nameCtrl.text.trim(),
+        'address': _addressCtrl.text.trim(),
+        'area': _areaCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim(),
+        'category': _category,
+        'capacity': int.tryParse(_capacityCtrl.text.trim()) ?? 100,
+        'location': {'latitude': -1.286389, 'longitude': 36.817223},
+      });
+      final venueId = (res.data['data'] as Map<String, dynamic>?)?['venueId'] as String? ?? '';
+      if (mounted) widget.onCreated(venueId);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed: $e'), backgroundColor: AppColors.red, behavior: SnackBarBehavior.floating,
+      ));
+    }
+    if (mounted) setState(() => _creating = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.bgCardDark : AppColors.bgCardLight,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Text('🏛️', style: TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Create Your Venue', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)),
+                const SizedBox(height: 2),
+                Text("You haven't registered a venue yet", style: TextStyle(fontSize: 12,
+                    color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight)),
+              ])),
+            ]),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        ...[
+          ('Venue Name *', _nameCtrl, 'e.g. Club Insomnia', TextInputType.text),
+          ('Address *', _addressCtrl, 'e.g. Westlands, Nairobi', TextInputType.text),
+          ('Area', _areaCtrl, 'e.g. Westlands', TextInputType.text),
+          ('Phone', _phoneCtrl, '+254 7XX XXX XXX', TextInputType.phone),
+          ('Capacity *', _capacityCtrl, 'e.g. 300', TextInputType.number),
+        ].expand((f) => [
+          Text(f.$1, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: f.$2,
+            keyboardType: f.$4,
+            style: TextStyle(fontSize: 14, color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+            decoration: InputDecoration(
+              hintText: f.$3,
+              hintStyle: TextStyle(fontSize: 13, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+              filled: true,
+              fillColor: isDark ? AppColors.bgElevatedDark : AppColors.bgElevatedLight,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? AppColors.borderDark : AppColors.borderLight)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? AppColors.borderDark : AppColors.borderLight)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.cyan, width: 1.5)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+            onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+          ),
+          const SizedBox(height: 12),
+        ]),
+        Text('Category', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+            color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8, runSpacing: 8,
+          children: _categories.map((c) => GestureDetector(
+            onTap: () => setState(() => _category = c),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _category == c ? AppColors.cyan.withOpacity(0.15) : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _category == c ? AppColors.cyan : (isDark ? AppColors.borderDark : AppColors.borderLight)),
+              ),
+              child: Text(c, style: TextStyle(
+                fontSize: 12, fontWeight: _category == c ? FontWeight.w700 : FontWeight.w400,
+                color: _category == c ? AppColors.cyan : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+              )),
+            ),
+          )).toList(),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity, height: 48,
+          child: GestureDetector(
+            onTap: _creating ? null : _create,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [AppColors.cyan, Color(0xFF0EA5E9)]),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: _creating
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Create Venue', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}

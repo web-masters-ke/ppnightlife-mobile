@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/pp_text_field.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/services/api_service.dart';
 
 class _RoleOption {
   final String id;
@@ -39,7 +40,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTickerProviderStateMixin {
-  // Step 0 = role select, Step 1 = form
+  // Step 0 = role select, Step 1 = form, Step 2 = venue create (venue-owner only)
   int _step = 0;
   _RoleOption? _selectedRole;
 
@@ -50,6 +51,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _agreeTerms = false;
+
+  // Venue creation (step 2)
+  final _venueNameCtrl = TextEditingController();
+  final _venueAddressCtrl = TextEditingController();
+  final _venueAreaCtrl = TextEditingController();
+  final _venuePhoneCtrl = TextEditingController();
+  final _venueCapacityCtrl = TextEditingController();
+  String _venueCategory = 'Club';
+  bool _venueCreating = false;
 
   late AnimationController _animController;
 
@@ -65,6 +75,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+    _venueNameCtrl.dispose();
+    _venueAddressCtrl.dispose();
+    _venueAreaCtrl.dispose();
+    _venuePhoneCtrl.dispose();
+    _venueCapacityCtrl.dispose();
     _animController.dispose();
     super.dispose();
   }
@@ -79,7 +94,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
   }
 
   void _goBack() {
-    if (_step == 1) {
+    if (_step == 2) {
+      setState(() => _step = 1);
+      _animController.reset();
+      _animController.forward();
+    } else if (_step == 1) {
       setState(() => _step = 0);
       _animController.reset();
       _animController.forward();
@@ -120,7 +139,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
     switch (role) {
       case 'venue_owner':
       case 'venue-owner':
-        context.go('/merchant');
+        // Go to venue creation step first
+        setState(() => _step = 2);
+        _animController.reset();
+        _animController.forward();
         break;
       case 'dj':
         context.go('/dj-studio');
@@ -132,6 +154,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
         context.go('/');
     }
   }
+
+  Future<void> _createVenue() async {
+    if (_venueNameCtrl.text.trim().isEmpty || _venueAddressCtrl.text.trim().isEmpty || _venueCapacityCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Venue name, address and capacity are required'), backgroundColor: AppColors.red),
+      );
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _venueCreating = true);
+    try {
+      await ApiService().createVenue({
+        'name': _venueNameCtrl.text.trim(),
+        'address': _venueAddressCtrl.text.trim(),
+        'area': _venueAreaCtrl.text.trim(),
+        'phone': _venuePhoneCtrl.text.trim().isNotEmpty ? _venuePhoneCtrl.text.trim() : _phoneController.text.trim(),
+        'category': _venueCategory,
+        'capacity': int.tryParse(_venueCapacityCtrl.text.trim()) ?? 100,
+        'location': {'latitude': -1.286389, 'longitude': 36.817223},
+      });
+    } catch (_) { /* non-blocking */ }
+    if (!mounted) return;
+    setState(() => _venueCreating = false);
+    context.go('/merchant');
+  }
+
+  void _skipVenueCreation() => context.go('/merchant');
 
   @override
   Widget build(BuildContext context) {
@@ -210,7 +259,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 250),
                           child: Text(
-                            _step == 0 ? 'Create account' : 'Your details',
+                            _step == 0 ? 'Create account' : _step == 1 ? 'Your details' : 'Your venue',
                             key: ValueKey(_step),
                             style: const TextStyle(
                               fontFamily: 'PlusJakartaSans',
@@ -230,7 +279,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                           border: Border.all(color: AppColors.borderDark),
                         ),
                         child: Text(
-                          'Step ${_step + 1} of 2',
+                          _selectedRole?.id == 'venue-owner'
+                              ? 'Step ${_step + 1} of 3'
+                              : 'Step ${_step + 1} of 2',
                           style: const TextStyle(fontSize: 11, color: AppColors.textMutedDark, fontWeight: FontWeight.w500),
                         ),
                       ),
@@ -244,7 +295,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(2),
                     child: LinearProgressIndicator(
-                      value: _step == 0 ? 0.5 : 1.0,
+                      value: _step == 0 ? 0.33 : (_step == 1 ? 0.66 : 1.0),
                       backgroundColor: AppColors.bgElevatedDark,
                       valueColor: const AlwaysStoppedAnimation<Color>(AppColors.purple),
                       minHeight: 3,
@@ -267,20 +318,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
                     ),
                     child: _step == 0
                         ? _RoleSelectStep(key: const ValueKey(0), onSelect: _selectRole)
-                        : _RegisterFormStep(
-                            key: const ValueKey(1),
-                            selectedRole: _selectedRole!,
-                            formKey: _formKey,
-                            nameController: _nameController,
-                            emailController: _emailController,
-                            phoneController: _phoneController,
-                            passwordController: _passwordController,
-                            isLoading: _isLoading,
-                            agreeTerms: _agreeTerms,
-                            onAgreeChanged: (v) => setState(() => _agreeTerms = v),
-                            onRegister: _register,
-                            onSignIn: () => context.go('/login'),
-                          ),
+                        : _step == 1
+                            ? _RegisterFormStep(
+                                key: const ValueKey(1),
+                                selectedRole: _selectedRole!,
+                                formKey: _formKey,
+                                nameController: _nameController,
+                                emailController: _emailController,
+                                phoneController: _phoneController,
+                                passwordController: _passwordController,
+                                isLoading: _isLoading,
+                                agreeTerms: _agreeTerms,
+                                onAgreeChanged: (v) => setState(() => _agreeTerms = v),
+                                onRegister: _register,
+                                onSignIn: () => context.go('/login'),
+                              )
+                            : _VenueCreateStep(
+                                key: const ValueKey(2),
+                                nameCtrl: _venueNameCtrl,
+                                addressCtrl: _venueAddressCtrl,
+                                areaCtrl: _venueAreaCtrl,
+                                phoneCtrl: _venuePhoneCtrl,
+                                capacityCtrl: _venueCapacityCtrl,
+                                category: _venueCategory,
+                                onCategoryChanged: (v) => setState(() => _venueCategory = v),
+                                creating: _venueCreating,
+                                onCreate: _createVenue,
+                                onSkip: _skipVenueCreation,
+                              ),
                   ),
                 ),
               ],
@@ -668,6 +733,142 @@ class _RegisterFormStep extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Step 3: Venue Create ──────────────────────────────────────────────────────
+class _VenueCreateStep extends StatelessWidget {
+  final TextEditingController nameCtrl, addressCtrl, areaCtrl, phoneCtrl, capacityCtrl;
+  final String category;
+  final ValueChanged<String> onCategoryChanged;
+  final bool creating;
+  final VoidCallback onCreate, onSkip;
+
+  const _VenueCreateStep({
+    super.key,
+    required this.nameCtrl, required this.addressCtrl, required this.areaCtrl,
+    required this.phoneCtrl, required this.capacityCtrl,
+    required this.category, required this.onCategoryChanged,
+    required this.creating, required this.onCreate, required this.onSkip,
+  });
+
+  static const _categories = ['Club', 'Bar', 'Rooftop', 'Lounge', 'Restaurant', 'Events Venue'];
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.cyan.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.cyan.withOpacity(0.3)),
+            ),
+            child: Row(children: [
+              const Text('🏛️', style: TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Register Your Venue', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+                const SizedBox(height: 2),
+                Text('This will appear on the venues discovery page', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.6))),
+              ])),
+            ]),
+          ),
+          const SizedBox(height: 20),
+          _field('Venue Name *', nameCtrl, 'e.g. Club Insomnia'),
+          const SizedBox(height: 12),
+          _field('Address *', addressCtrl, 'e.g. Westlands, Nairobi'),
+          const SizedBox(height: 12),
+          _field('Area / Neighbourhood', areaCtrl, 'e.g. Westlands'),
+          const SizedBox(height: 12),
+          _field('Phone', phoneCtrl, '+254 7XX XXX XXX', keyboardType: TextInputType.phone),
+          const SizedBox(height: 12),
+          _field('Capacity *', capacityCtrl, 'e.g. 300', keyboardType: TextInputType.number),
+          const SizedBox(height: 12),
+          Text('Category', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.6))),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8, runSpacing: 8,
+            children: _categories.map((c) => GestureDetector(
+              onTap: () => onCategoryChanged(c),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: category == c ? AppColors.cyan.withOpacity(0.2) : AppColors.bgElevatedDark,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: category == c ? AppColors.cyan : AppColors.borderDark),
+                ),
+                child: Text(c, style: TextStyle(
+                  fontSize: 12, fontWeight: category == c ? FontWeight.w700 : FontWeight.w400,
+                  color: category == c ? AppColors.cyan : Colors.white54,
+                )),
+              ),
+            )).toList(),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity, height: 50,
+            child: GestureDetector(
+              onTap: creating ? null : onCreate,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [AppColors.cyan, Color(0xFF0EA5E9)]),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: creating
+                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                      : const Row(mainAxisSize: MainAxisSize.min, children: [
+                          Text('🏛️', style: TextStyle(fontSize: 16)),
+                          SizedBox(width: 8),
+                          Text('Create Venue & Continue', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                        ]),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: TextButton(
+              onPressed: onSkip,
+              child: Text('Skip for now — set up later in settings',
+                style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.4))),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(String label, TextEditingController ctrl, String hint, {TextInputType? keyboardType}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.6))),
+        const SizedBox(height: 6),
+        TextField(
+          controller: ctrl,
+          keyboardType: keyboardType,
+          style: const TextStyle(fontSize: 14, color: Colors.white),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.3)),
+            filled: true,
+            fillColor: AppColors.bgElevatedDark,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.borderDark)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.borderDark)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.cyan, width: 1.5)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          ),
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+        ),
+      ],
     );
   }
 }

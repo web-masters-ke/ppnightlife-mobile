@@ -12,6 +12,7 @@ import '../../features/venues/screens/venues_screen.dart';
 import '../../features/chat/screens/chat_list_screen.dart';
 import '../../features/wallet/screens/wallet_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
+import '../../features/profile/screens/user_profile_screen.dart';
 import '../../features/feed/screens/post_detail_screen.dart';
 import '../../features/venues/screens/venue_detail_screen.dart';
 import '../../features/chat/screens/chat_room_screen.dart';
@@ -33,6 +34,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login',        builder: (c, s) => const LoginScreen()),
       GoRoute(path: '/register',     builder: (c, s) => const RegisterScreen()),
       GoRoute(path: '/post/:id',     builder: (c, s) => PostDetailScreen(postId: s.pathParameters['id']!)),
+      GoRoute(path: '/user/:id',     builder: (c, s) => UserProfileScreen(userId: s.pathParameters['id']!)),
       GoRoute(path: '/venue/:id',    builder: (c, s) => VenueDetailScreen(venueId: s.pathParameters['id']!)),
       GoRoute(path: '/chat/:id',     builder: (c, s) => ChatRoomScreen(roomId: s.pathParameters['id']!)),
       GoRoute(path: '/notifications', builder: (c, s) => const NotificationsScreen()),

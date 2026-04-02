@@ -61,6 +61,20 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
     try { return widget.post.postId as String?; } catch (_) { return null; }
   }
 
+  String? get _userId {
+    try { return widget.post.userId as String?; } catch (_) { return null; }
+  }
+
+  void _openUserProfile() {
+    final uid = _userId;
+    if (uid != null && uid.isNotEmpty) context.push('/user/$uid');
+  }
+
+  void _openPostDetail() {
+    final id = _postId;
+    if (id != null && id.isNotEmpty) context.push('/post/$id');
+  }
+
   void _onReactionTap(String emoji) {
     HapticFeedback.lightImpact();
     final reactions = const [('❤️', 'love'), ('🔥', 'fire'), ('💜', 'vibe'), ('🎉', 'party'), ('😂', 'lol'), ('😮', 'wow')];
@@ -147,7 +161,9 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
             child: Row(
               children: [
                 // Avatar
-                Stack(
+                GestureDetector(
+                  onTap: _openUserProfile,
+                  child: Stack(
                   children: [
                     Container(
                       width: 40,
@@ -200,6 +216,7 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
                       ),
                   ],
                 ),
+                ),  // GestureDetector (avatar)
                 const SizedBox(width: 10),
 
                 // User info
@@ -209,12 +226,15 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
                     children: [
                       Row(
                         children: [
-                          Text(
-                            post.username as String,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                          GestureDetector(
+                            onTap: _openUserProfile,
+                            child: Text(
+                              post.username as String,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                              ),
                             ),
                           ),
                           if (post.isDJ as bool) ...[
@@ -296,10 +316,7 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
 
                 // More
                 GestureDetector(
-                  onTap: () {
-                    final id = _postId;
-                    if (id != null && id.isNotEmpty) context.push('/post/$id');
-                  },
+                  onTap: _openPostDetail,
                   child: HugeIcon(
                     icon: HugeIcons.strokeRoundedMoreHorizontal,
                     size: 20,
@@ -313,14 +330,17 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
           const SizedBox(height: 10),
 
           // Content
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Text(
-              post.content as String,
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.5,
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+          GestureDetector(
+            onTap: _openPostDetail,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Text(
+                post.content as String,
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.5,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                ),
               ),
             ),
           ),
@@ -441,10 +461,7 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
 
                 // Comment — icon + count
                 GestureDetector(
-                  onTap: () {
-                    final id = _postId;
-                    if (id != null && id.isNotEmpty) context.push('/post/$id');
-                  },
+                  onTap: _openPostDetail,
                   child: Row(
                     children: [
                       HugeIcon(
@@ -633,8 +650,8 @@ class _FeedVideoPlayerState extends State<_FeedVideoPlayer> {
             if (!c.value.isPlaying)
               Container(
                 decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
-                padding: const EdgeInsets.all(14),
-                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 44),
+                padding: const EdgeInsets.all(8),
+                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
               ),
             // Mute toggle — bottom right corner
             Positioned(

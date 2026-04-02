@@ -106,7 +106,7 @@ class _StoryRowState extends ConsumerState<StoryRow> {
     final me = ref.watch(authProvider).user;
 
     return SizedBox(
-      height: 124,
+      height: 134,
       child: _loading
           ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.purple)))
           : ListView.builder(
@@ -152,7 +152,7 @@ class _AddStoryButton extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  width: 84, height: 84,
+                  width: 88, height: 88,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isDark ? AppColors.bgElevatedDark : AppColors.bgElevatedLight,
@@ -222,7 +222,7 @@ class _StoryBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 72, height: 72,
+              width: 88, height: 88,
               padding: const EdgeInsets.all(2.5),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -243,7 +243,7 @@ class _StoryBubble extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             SizedBox(
-              width: 72,
+              width: 88,
               child: Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
                       color: seen

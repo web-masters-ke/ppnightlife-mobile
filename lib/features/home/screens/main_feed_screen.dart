@@ -129,6 +129,7 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
     }).where((s) => s.isNotEmpty).toList();
     return _MockPost(
       postId: p['postId'] as String? ?? '',
+      userId: p['author']?['id'] as String? ?? p['author']?['_id'] as String? ?? '',
       username: p['author']?['name'] as String? ?? 'User',
       userAvatar: p['author']?['profilePhoto'] as String? ?? '',
       timeAgo: _fmtTime(p['createdAt'] as String?),
@@ -345,10 +346,10 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
               SliverToBoxAdapter(
                 child: Container(
                   color: isDark ? AppColors.bgDark : Colors.white,
-                  height: 44,
+                  height: 40,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
+                    padding: const EdgeInsets.fromLTRB(14, 2, 14, 2),
                     children: _filters.map((f) {
                       final sel = f == _selectedFilter;
                       return GestureDetector(
@@ -378,9 +379,6 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
                 ),
               ),
 
-              // Live venues widget
-              if (_liveVenuesList.isNotEmpty)
-                SliverToBoxAdapter(child: _LiveVenuesRow(isDark: isDark, venues: _liveVenuesList)),
 
               // Feed posts with leaderboard injected after 5th post
               SliverList(
@@ -798,7 +796,7 @@ class _EmptyFilter extends StatelessWidget {
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
 class _MockPost {
-  final String postId, username, userAvatar, timeAgo, venue, content, badge;
+  final String postId, userId, username, userAvatar, timeAgo, venue, content, badge;
   final int likes, comments;
   final int? level;
   final bool isImage, isVideo, isDJ;
@@ -806,6 +804,7 @@ class _MockPost {
 
   _MockPost({
     this.postId = '',
+    this.userId = '',
     required this.username,
     required this.userAvatar,
     required this.timeAgo,
