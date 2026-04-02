@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/providers/auth_provider.dart';
@@ -69,23 +70,21 @@ class _StoryRowState extends ConsumerState<StoryRow> {
   }
 
   void _openViewer(int index) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'story',
-      barrierColor: Colors.black.withValues(alpha: 0.92),
-      transitionDuration: const Duration(milliseconds: 220),
-      transitionBuilder: (_, anim, __, child) => ScaleTransition(
-        scale: CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
-        child: FadeTransition(opacity: anim, child: child),
-      ),
-      pageBuilder: (ctx, _, __) => _StoryViewer(
-        statuses: _statuses,
-        initialIndex: index,
-        myUserId: ref.read(authProvider).user?.userId ?? '',
-        onSeen: (id) {
-          setState(() => _seenIds.add(id));
-        },
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (ctx, _, __) => _StoryViewer(
+          statuses: _statuses,
+          initialIndex: index,
+          myUserId: ref.read(authProvider).user?.userId ?? '',
+          onSeen: (id) {
+            setState(() => _seenIds.add(id));
+          },
+        ),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
       ),
     );
   }
@@ -107,7 +106,7 @@ class _StoryRowState extends ConsumerState<StoryRow> {
     final me = ref.watch(authProvider).user;
 
     return SizedBox(
-      height: 100,
+      height: 110,
       child: _loading
           ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.purple)))
           : ListView.builder(
@@ -153,34 +152,34 @@ class _AddStoryButton extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  width: 64, height: 64,
+                  width: 72, height: 72,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isDark ? AppColors.bgElevatedDark : AppColors.bgElevatedLight,
                     border: Border.all(
                       color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                      width: 1.5,
+                      width: 2,
                       strokeAlign: BorderSide.strokeAlignOutside,
                     ),
                   ),
                   child: ClipOval(
                     child: photo != null
-                        ? Image.network(photo, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, size: 30, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight))
-                        : Icon(Icons.person_rounded, size: 30, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+                        ? Image.network(photo, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, size: 34, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight))
+                        : Icon(Icons.person_rounded, size: 34, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
                   ),
                 ),
                 Positioned(
                   bottom: 0, right: 0,
                   child: Container(
-                    width: 22, height: 22,
+                    width: 24, height: 24,
                     decoration: const BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
-                    child: const Icon(Icons.add, color: Colors.white, size: 14),
+                    child: const Icon(Icons.add, color: Colors.white, size: 16),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 4),
-            Text('Your Story', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
+            Text('Your story', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
                 color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
           ],
         ),
@@ -208,19 +207,26 @@ class _StoryBubble extends StatelessWidget {
     final role = author['role'] as String? ?? '';
     final isVenue = role == 'merchant';
 
+    // Instagram-style gradient ring (orange→pink→purple) for unread
+    const igRing = LinearGradient(
+      begin: Alignment.bottomLeft,
+      end: Alignment.topRight,
+      colors: [Color(0xFFF09433), Color(0xFFE6683C), Color(0xFFDC2743), Color(0xFFCC2366), Color(0xFFBC1888)],
+    );
+
     return Padding(
-      padding: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.only(right: 14),
       child: GestureDetector(
         onTap: onTap,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 64, height: 64,
+              width: 72, height: 72,
               padding: const EdgeInsets.all(2.5),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: seen ? null : (isVenue ? AppColors.warmGradient : AppColors.primaryGradient),
+                gradient: seen ? null : igRing,
                 color: seen ? (isDark ? AppColors.borderDark : AppColors.borderLight) : null,
               ),
               child: Container(
@@ -237,7 +243,7 @@ class _StoryBubble extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             SizedBox(
-              width: 64,
+              width: 72,
               child: Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
                       color: seen
@@ -278,12 +284,19 @@ class _StoryViewer extends StatefulWidget {
   State<_StoryViewer> createState() => _StoryViewerState();
 }
 
+bool _isVideoUrl(String url) {
+  final lower = url.toLowerCase();
+  return lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.webm') || lower.contains('/video/');
+}
+
 class _StoryViewerState extends State<_StoryViewer> with SingleTickerProviderStateMixin {
   late int _index;
   late AnimationController _progress;
   List<Map<String, dynamic>> _viewers = [];
   bool _showViewers = false;
   bool _loadingViewers = false;
+  VideoPlayerController? _videoController;
+  bool _videoInitialized = false;
 
   static const _duration = Duration(seconds: 5);
 
@@ -298,9 +311,46 @@ class _StoryViewerState extends State<_StoryViewer> with SingleTickerProviderSta
     _startStory();
   }
 
+  Future<void> _initVideo(String url) async {
+    _videoController?.dispose();
+    _videoController = null;
+    _videoInitialized = false;
+    final c = VideoPlayerController.networkUrl(Uri.parse(url));
+    _videoController = c;
+    try {
+      await c.initialize();
+      if (mounted) {
+        setState(() => _videoInitialized = true);
+        _progress.duration = c.value.duration;
+        _progress.reset();
+        _progress.forward();
+        c.play();
+      }
+    } catch (_) {
+      if (mounted) setState(() {});
+    }
+  }
+
   void _startStory() {
-    _progress.reset();
-    _progress.forward();
+    _videoController?.pause();
+    _videoController?.dispose();
+    _videoController = null;
+    _videoInitialized = false;
+
+    final media = (_current['media'] as List?)?.cast<String>() ?? [];
+    final hasVideo = media.isNotEmpty && _isVideoUrl(media.first);
+
+    if (!hasVideo) {
+      _progress.duration = _duration;
+      _progress.reset();
+      _progress.forward();
+    } else {
+      // Video duration will be set after init
+      _progress.duration = _duration;
+      _progress.reset();
+      _initVideo(media.first);
+    }
+
     _viewers = [];
     _showViewers = false;
     final postId = _current['postId'] as String? ?? '';
@@ -345,6 +395,7 @@ class _StoryViewerState extends State<_StoryViewer> with SingleTickerProviderSta
   @override
   void dispose() {
     _progress.dispose();
+    _videoController?.dispose();
     super.dispose();
   }
 
@@ -376,225 +427,296 @@ class _StoryViewerState extends State<_StoryViewer> with SingleTickerProviderSta
     }
 
     final screenSize = MediaQuery.of(context).size;
-    final viewerW = (screenSize.width * 0.92).clamp(0.0, 420.0);
-    final viewerH = (screenSize.height * 0.92).clamp(0.0, 860.0);
+    final safeBottom = MediaQuery.of(context).padding.bottom;
+    final firstName2 = authorName.split(' ').first;
 
-    return Center(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: SizedBox(
-          width: viewerW,
-          height: viewerH,
-          child: Stack(
-            children: [
-              // Background
-              Positioned.fill(child: Container(color: bgColor)),
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // ── Background colour (text-only stories) ──────────────────────────
+          Positioned.fill(child: Container(color: media.isEmpty ? bgColor : Colors.black)),
 
-              // Media
-              if (media.isNotEmpty)
-                Positioned.fill(
-                  child: Image.network(media.first, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox()),
-                ),
-
-              // Bottom gradient for text overlay
-              if (media.isNotEmpty && content.isNotEmpty)
-                Positioned(
-                  bottom: 0, left: 0, right: 0,
-                  height: viewerH * 0.4,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [Colors.black87, Colors.transparent],
-                      ),
-                    ),
-                  ),
-                ),
-
-              // Centered text (text-only story)
-              if (media.isEmpty && content.isNotEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Text(content, textAlign: TextAlign.center, style: _storyTextStyle(fontStyle, size: 28)),
-                  ),
-                ),
-
-              // Text overlay on media
-              if (media.isNotEmpty && content.isNotEmpty)
-                Positioned(
-                  bottom: isOwn ? 110 : 60,
-                  left: 20, right: 20,
-                  child: Text(content, textAlign: TextAlign.center, style: _storyTextStyle(fontStyle, size: 22)),
-                ),
-
-              // Tap zones
-              Positioned.fill(
-                child: Row(
-                  children: [
-                    Expanded(child: GestureDetector(onTap: _prev, behavior: HitTestBehavior.translucent)),
-                    Expanded(child: GestureDetector(onTap: _next, behavior: HitTestBehavior.translucent)),
-                  ],
-                ),
-              ),
-
-              // Progress bars
-              Positioned(
-                top: 12, left: 12, right: 12,
-                child: Row(
-                  children: List.generate(widget.statuses.length, (i) {
-                    return Expanded(
-                      child: Container(
-                        height: 3,
-                        margin: const EdgeInsets.symmetric(horizontal: 1),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        child: i < _index
-                            ? Container(decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(2)))
-                            : i == _index
-                                ? AnimatedBuilder(
-                                    animation: _progress,
-                                    builder: (_, __) => FractionallySizedBox(
-                                      alignment: Alignment.centerLeft,
-                                      widthFactor: _progress.value,
-                                      child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2))),
-                                    ),
-                                  )
-                                : const SizedBox(),
-                      ),
-                    );
-                  }),
-                ),
-              ),
-
-              // Author row
-              Positioned(
-                top: 28, left: 12, right: 12,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36, height: 36,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black26),
-                      child: ClipOval(
-                        child: authorPhoto != null
-                            ? Image.network(authorPhoto, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 20))
-                            : const Icon(Icons.person, color: Colors.white, size: 20),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(authorName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                          if (timeLeft.isNotEmpty)
-                            Text(timeLeft, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Reactions (bottom center)
-              Positioned(
-                bottom: isOwn ? 108 : 16,
-                left: 0, right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: ['❤️', '🔥', '💜', '🎉'].map((e) => GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Reacted $e'), duration: const Duration(seconds: 1), behavior: SnackBarBehavior.floating),
-                      );
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                      width: 44, height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(child: Text(e, style: const TextStyle(fontSize: 22))),
-                    ),
-                  )).toList(),
-                ),
-              ),
-
-              // Viewer panel (own stories only)
-              if (isOwn)
-                Positioned(
-                  bottom: 12, left: 12, right: 12,
-                  child: GestureDetector(
-                    onTap: () => setState(() => _showViewers = !_showViewers),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              const Text('👁', style: TextStyle(fontSize: 14)),
-                              const SizedBox(width: 6),
-                              Text(
-                                _loadingViewers
-                                    ? 'Loading viewers...'
-                                    : 'Viewed by ${_viewers.length} ${_viewers.length == 1 ? 'person' : 'people'}',
-                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                              ),
-                              const Spacer(),
-                              Icon(_showViewers ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up, color: Colors.white70, size: 18),
-                            ],
+          // ── Full-screen media ──────────────────────────────────────────────
+          if (media.isNotEmpty)
+            Positioned.fill(
+              child: _isVideoUrl(media.first)
+                  ? (_videoInitialized && _videoController != null
+                      ? FittedBox(
+                          fit: BoxFit.cover,
+                          clipBehavior: Clip.hardEdge,
+                          child: SizedBox(
+                            width: _videoController!.value.size.width,
+                            height: _videoController!.value.size.height,
+                            child: VideoPlayer(_videoController!),
                           ),
-                          if (_showViewers && _viewers.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            ...  _viewers.take(5).map((v) => Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Row(
+                        )
+                      : const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
+                  : Image.network(media.first, fit: BoxFit.cover,
+                      width: screenSize.width, height: screenSize.height,
+                      errorBuilder: (_, __, ___) => const SizedBox()),
+            ),
+
+          // ── Top gradient scrim ─────────────────────────────────────────────
+          if (media.isNotEmpty)
+            Positioned(
+              top: 0, left: 0, right: 0, height: 140,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    colors: [Color(0xBB000000), Colors.transparent],
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Bottom gradient scrim ──────────────────────────────────────────
+          Positioned(
+            bottom: 0, left: 0, right: 0, height: 180,
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter, end: Alignment.topCenter,
+                  colors: [Color(0xCC000000), Colors.transparent],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Centered text (text-only) ──────────────────────────────────────
+          if (media.isEmpty && content.isNotEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Text(content, textAlign: TextAlign.center,
+                    style: _storyTextStyle(fontStyle, size: 30)),
+              ),
+            ),
+
+          // ── Text caption on media ──────────────────────────────────────────
+          if (media.isNotEmpty && content.isNotEmpty)
+            Positioned(
+              bottom: isOwn ? 130 : 90,
+              left: 20, right: 20,
+              child: Text(content, textAlign: TextAlign.center,
+                  style: _storyTextStyle(fontStyle, size: 20)),
+            ),
+
+          // ── Tap zones (left = prev, right = next) ─────────────────────────
+          Positioned.fill(
+            child: Row(
+              children: [
+                Expanded(child: GestureDetector(onTap: _prev, behavior: HitTestBehavior.translucent)),
+                Expanded(child: GestureDetector(onTap: _next, behavior: HitTestBehavior.translucent)),
+              ],
+            ),
+          ),
+
+          // ── Progress bars ─────────────────────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 8, right: 8,
+            child: Row(
+              children: List.generate(widget.statuses.length, (i) {
+                return Expanded(
+                  child: Container(
+                    height: 2,
+                    margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                    child: i < _index
+                        ? Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2)))
+                        : i == _index
+                            ? AnimatedBuilder(
+                                animation: _progress,
+                                builder: (_, __) => FractionallySizedBox(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor: _progress.value,
+                                  child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2))),
+                                ),
+                              )
+                            : const SizedBox(),
+                  ),
+                );
+              }),
+            ),
+          ),
+
+          // ── Author row ─────────────────────────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 18,
+            left: 12, right: 12,
+            child: Row(
+              children: [
+                // IG-style gradient ring avatar
+                Container(
+                  width: 40, height: 40,
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomLeft, end: Alignment.topRight,
+                      colors: [Color(0xFFF09433), Color(0xFFE6683C), Color(0xFFDC2743), Color(0xFFCC2366), Color(0xFFBC1888)],
+                    ),
+                  ),
+                  child: Container(
+                    decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.black),
+                    child: ClipOval(
+                      child: authorPhoto != null
+                          ? Image.network(authorPhoto, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 22))
+                          : const Icon(Icons.person, color: Colors.white, size: 22),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(authorName,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14,
+                              shadows: [Shadow(blurRadius: 4, color: Colors.black54)])),
+                      if (timeLeft.isNotEmpty)
+                        Text(timeLeft,
+                            style: const TextStyle(color: Colors.white70, fontSize: 11,
+                                shadows: [Shadow(blurRadius: 4, color: Colors.black54)])),
+                    ],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.25),
+                    ),
+                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Bottom bar: viewers (own) OR reply input ───────────────────────
+          Positioned(
+            bottom: safeBottom + 12,
+            left: 12, right: 12,
+            child: isOwn
+                ? GestureDetector(
+                    onTap: () => setState(() => _showViewers = !_showViewers),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.40),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
                                 children: [
-                                  Container(
-                                    width: 28, height: 28,
-                                    decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white24),
-                                    child: ClipOval(
-                                      child: v['profilePhoto'] != null
-                                          ? Image.network(v['profilePhoto'], fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white, size: 16))
-                                          : const Icon(Icons.person, color: Colors.white, size: 16),
+                                  const Text('👁', style: TextStyle(fontSize: 15)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _loadingViewers
+                                          ? 'Loading...'
+                                          : '${_viewers.length} viewer${_viewers.length != 1 ? 's' : ''}',
+                                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(v['name'] as String? ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
-                                  const SizedBox(width: 6),
-                                  if ((v['role'] as String?)?.isNotEmpty == true)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(6)),
-                                      child: Text(v['role'] as String? ?? '', style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                                    ),
+                                  Icon(_showViewers ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+                                      color: Colors.white60, size: 20),
                                 ],
                               ),
-                            )),
-                          ],
-                        ],
+                              if (_showViewers && _viewers.isNotEmpty) ...[
+                                const SizedBox(height: 10),
+                                ..._viewers.take(5).map((v) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 30, height: 30,
+                                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white24),
+                                        child: ClipOval(
+                                          child: v['profilePhoto'] != null
+                                              ? Image.network(v['profilePhoto'], fit: BoxFit.cover)
+                                              : const Icon(Icons.person, color: Colors.white, size: 16),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(child: Text(v['name'] as String? ?? '',
+                                          style: const TextStyle(color: Colors.white, fontSize: 13))),
+                                    ],
+                                  ),
+                                )),
+                              ],
+                            ],
+                          ),
+                        ),
                       ),
                     ),
+                  )
+                : Row(
+                    children: [
+                      // Reply text field (IG-style pill)
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              height: 46,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.5),
+                                color: Colors.black.withValues(alpha: 0.15),
+                              ),
+                              child: Center(
+                                child: TextField(
+                                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                                  decoration: InputDecoration(
+                                    hintText: 'Reply to $firstName2…',
+                                    hintStyle: const TextStyle(color: Colors.white60, fontSize: 14),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Quick reactions
+                      ...['❤️', '🔥', '💜', '🎉'].map((e) => GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Reacted $e'),
+                                duration: const Duration(seconds: 1), behavior: SnackBarBehavior.floating),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Text(e, style: const TextStyle(fontSize: 24)),
+                        ),
+                      )),
+                    ],
                   ),
-                ),
-            ],
           ),
-        ),
+        ],
       ),
     );
   }

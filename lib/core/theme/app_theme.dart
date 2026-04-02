@@ -116,13 +116,22 @@ class AppTheme {
         foregroundColor: AppColors.textPrimaryDark,
         elevation: 0,
         scrolledUnderElevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: AppColors.bgDark,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
         centerTitle: false,
         titleTextStyle: GoogleFonts.plusJakartaSans(
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimaryDark,
         ),
+      ),
+      tabBarTheme: const TabBarThemeData(
+        labelColor: AppColors.textPrimaryDark,
+        unselectedLabelColor: AppColors.textMutedDark,
+        indicatorColor: AppColors.purple,
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.bgCardDark,
@@ -255,13 +264,22 @@ class AppTheme {
         foregroundColor: AppColors.textPrimaryLight,
         elevation: 0,
         scrolledUnderElevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: AppColors.bgLight,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
         centerTitle: false,
         titleTextStyle: GoogleFonts.plusJakartaSans(
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimaryLight,
         ),
+      ),
+      tabBarTheme: const TabBarThemeData(
+        labelColor: AppColors.textPrimaryLight,
+        unselectedLabelColor: AppColors.textMutedLight,
+        indicatorColor: AppColors.purple,
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.bgCardLight,

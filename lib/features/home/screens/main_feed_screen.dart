@@ -7,7 +7,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/gradient_text.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/providers/auth_provider.dart';
-import '../../feed/screens/create_post_screen.dart';
 import '../../feed/widgets/story_row.dart';
 import '../../feed/widgets/feed_post_card.dart';
 
@@ -49,14 +48,31 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
   bool _loadingMore = false;
   bool _hasMore = true;
   int _page = 1;
+  bool _initialLoadDone = false;
 
   @override
   void initState() {
     super.initState();
-    _loadFeed();
-    _loadLiveVenues();
-    _loadTopTippers();
     _scrollController.addListener(_onScroll);
+    // Defer until after first build so auth state is available
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootLoad());
+  }
+
+  /// Called once after the first frame — auth may or may not be ready yet.
+  void _bootLoad() {
+    final status = ref.read(authProvider).status;
+    if (status == AuthStatus.authenticated) {
+      _initialLoadDone = true;
+      _loadFeed();
+      _loadLiveVenues();
+      _loadTopTippers();
+    }
+    // If still loading auth, ref.listen below will fire when it settles.
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
   }
 
   void _onScroll() {
@@ -120,13 +136,23 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
       content: p['content'] as String? ?? '',
       likes: (p['reactionCount'] as num?)?.toInt() ?? 0,
       comments: (p['commentCount'] as num?)?.toInt() ?? 0,
-      isImage: urls.isNotEmpty && p['type'] != 'video',
-      isVideo: p['type'] == 'video',
+      isImage: urls.isNotEmpty && !_isVideoPost(p, urls),
+      isVideo: _isVideoPost(p, urls),
       badge: _badgeFor(p['type'] as String?),
       isDJ: p['author']?['role'] == 'dj',
       level: (p['author']?['level'] as num?)?.toInt(),
       mediaUrls: urls,
     );
+  }
+
+  static bool _isVideoPost(Map<String, dynamic> p, List<String> urls) {
+    if (p['type'] == 'video') return true;
+    if (urls.isNotEmpty) {
+      final url = urls.first.toLowerCase();
+      if (url.endsWith('.mp4') || url.endsWith('.mov') || url.endsWith('.webm') ||
+          url.contains('/video/') || url.contains('video')) return true;
+    }
+    return false;
   }
 
   Future<void> _loadLiveVenues() async {
@@ -197,19 +223,20 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
     return posts;
   }
 
-  void _showStatusCreator() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _StatusCreatorSheet(isDark: Theme.of(context).brightness == Brightness.dark),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final me = ref.watch(authProvider).user;
+
+    // When auth finishes loading and user is authenticated, load feed if not done yet
+    ref.listen(authProvider, (prev, next) {
+      if (!_initialLoadDone && next.status == AuthStatus.authenticated) {
+        _initialLoadDone = true;
+        _loadFeed();
+        _loadLiveVenues();
+        _loadTopTippers();
+      }
+    });
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgCardLight,
@@ -313,59 +340,6 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
             slivers: [
               // Stories / Status row
               const SliverToBoxAdapter(child: StoryRow()),
-
-              // Create post / status bar
-              SliverToBoxAdapter(
-                child: Container(
-                  color: isDark ? AppColors.bgDark : Colors.white,
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                  child: Row(
-                    children: [
-                      // User avatar
-                      Container(
-                        width: 38, height: 38,
-                        decoration: const BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
-                        child: ClipOval(
-                          child: me?.profilePhoto != null
-                              ? Image.network(me!.profilePhoto!, fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 20, color: Colors.white)))
-                              : const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 20, color: Colors.white)),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => Navigator.of(context, rootNavigator: true).push(
-                            MaterialPageRoute(builder: (_) => const CreatePostScreen(postType: 'text'))),
-                          child: Container(
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: isDark ? AppColors.bgElevatedDark : AppColors.bgElevatedLight,
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              "What's the vibe tonight?",
-                              style: TextStyle(fontSize: 14, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: _showStatusCreator,
-                        child: Container(
-                          width: 38, height: 38,
-                          decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(10)),
-                          child: const Center(child: Text('✨', style: TextStyle(fontSize: 18))),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
 
               // Filter chips
               SliverToBoxAdapter(

@@ -17,6 +17,7 @@ class VenueDetailScreen extends StatefulWidget {
 class _VenueDetailScreenState extends State<VenueDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int _selectedTab = 0;
   bool _checkedIn = false;
   bool _checkingIn = false;
   bool _isSaved = false;
@@ -27,6 +28,11 @@ class _VenueDetailScreenState extends State<VenueDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() => _selectedTab = _tabController.index);
+      }
+    });
     _loadVenue();
     _loadCheckinStatus();
   }
@@ -397,7 +403,16 @@ class _VenueDetailScreenState extends State<VenueDetailScreen>
                       Expanded(
                         flex: 1,
                         child: GestureDetector(
-                          onTap: () => context.push('/chat/venue_insomnia'),
+                          onTap: () async {
+                        final ownerId = _venueData?['ownerId'] as String? ?? _venueData?['owner_id'] as String?;
+                        if (ownerId == null || ownerId.isEmpty) return;
+                        try {
+                          final res = await ApiService().openChat(ownerId);
+                          final data = res.data['data'] ?? res.data;
+                          final roomId = data['roomId'] as String? ?? data['room_id'] as String;
+                          if (context.mounted) context.push('/chat/$roomId');
+                        } catch (_) {}
+                      },
                           child: Container(
                             height: 48,
                             decoration: BoxDecoration(
@@ -454,18 +469,18 @@ class _VenueDetailScreenState extends State<VenueDetailScreen>
             ),
           ),
 
-          // Tab content
-          SliverFillRemaining(
-            hasScrollBody: false,
+          // Tab content — rendered directly (no TabBarView) to avoid zero-height in CustomScrollView
+          SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TabBarView(
-                controller: _tabController,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              child: IndexedStack(
+                index: _selectedTab,
+                sizing: StackFit.loose,
                 children: [
                   _AboutTab(isDark: isDark, venueData: _venueData),
                   _DJLineupTab(isDark: isDark, venueData: _venueData),
                   _OffersTab(isDark: isDark, venueData: _venueData),
-                  _DJRoomTab(isDark: isDark),
+                  _DJRoomTab(isDark: isDark, venueId: widget.venueId),
                 ],
               ),
             ),
@@ -930,7 +945,8 @@ class _OfferCard extends StatelessWidget {
 // ── DJ Room Tab ───────────────────────────────────────────────────────────────
 class _DJRoomTab extends StatefulWidget {
   final bool isDark;
-  const _DJRoomTab({required this.isDark});
+  final String venueId;
+  const _DJRoomTab({required this.isDark, required this.venueId});
 
   @override
   State<_DJRoomTab> createState() => _DJRoomTabState();
@@ -940,6 +956,16 @@ class _DJRoomTabState extends State<_DJRoomTab> {
   final _reqCtrl = TextEditingController();
   int? _selectedTip;
   bool _submitting = false;
+  bool _loading = false;
+  List<Map<String, dynamic>> _queue = [];
+  Map<String, dynamic>? _nowPlaying;
+  final Set<String> _votedIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQueue();
+  }
 
   @override
   void dispose() {
@@ -947,96 +973,116 @@ class _DJRoomTabState extends State<_DJRoomTab> {
     super.dispose();
   }
 
+  Future<void> _loadQueue() async {
+    setState(() => _loading = true);
+    try {
+      final res = await ApiService().getDJQueue(venueId: widget.venueId);
+      final data = res.data['data'] ?? res.data;
+      final queue = ((data['queue'] as List?) ?? []).cast<Map<String, dynamic>>();
+      final np = data['nowPlaying'] as Map<String, dynamic>?;
+      if (mounted) setState(() { _queue = queue; _nowPlaying = np; });
+    } catch (_) {}
+    if (mounted) setState(() => _loading = false);
+  }
+
   Future<void> _submitRequest() async {
     if (_reqCtrl.text.trim().isEmpty) return;
     HapticFeedback.mediumImpact();
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() {
-      _submitting = false;
-      _reqCtrl.clear();
-      _selectedTip = null;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+    try {
+      final parts = _reqCtrl.text.trim().split(' - ');
+      final songName = parts[0].trim();
+      final artistName = parts.length > 1 ? parts.sublist(1).join(' - ').trim() : 'Unknown';
+      await ApiService().requestSong({
+        'venueId': widget.venueId,
+        'songName': songName,
+        'artistName': artistName,
+        if (_selectedTip != null) 'tip': _selectedTip,
+      });
+      if (!mounted) return;
+      setState(() { _submitting = false; _reqCtrl.clear(); _selectedTip = null; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: const Text('🎵 Song request sent to the DJ!'),
         backgroundColor: AppColors.pink,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 2),
-      ),
-    );
+      ));
+      _loadQueue();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed: $e'),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+    }
+  }
+
+  Future<void> _vote(String requestId) async {
+    final alreadyVoted = _votedIds.contains(requestId);
+    setState(() {
+      alreadyVoted ? _votedIds.remove(requestId) : _votedIds.add(requestId);
+      _queue = _queue.map((r) {
+        if (r['requestId'] == requestId) {
+          final v = (r['votes'] as num?)?.toInt() ?? 0;
+          return {...r, 'votes': v + (alreadyVoted ? -1 : 1)};
+        }
+        return r;
+      }).toList();
+    });
+    try {
+      await ApiService().voteSongRequest(requestId, alreadyVoted ? 'downvote' : 'upvote');
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(top: 4, bottom: 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Now playing
-          Container(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 4),
+          // Now playing (real data)
+          if (_nowPlaying != null) Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: AppColors.warmGradient,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [BoxShadow(color: AppColors.orange.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 5))],
             ),
-            child: Column(
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Center(child: Text('🎵', style: TextStyle(fontSize: 26))),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Now Playing', style: TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w500)),
-                          Text('Essence - Wizkid ft. Tems', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
-                          Text('DJ Marcus K', style: TextStyle(fontSize: 12, color: Colors.white70)),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
-                      child: const Text('🔴 LIVE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
-                    ),
-                  ],
+                Container(
+                  width: 52, height: 52,
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(10)),
+                  child: const Center(child: Text('🎵', style: TextStyle(fontSize: 26))),
                 ),
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: 0.45,
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                    minHeight: 3,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Now Playing', style: TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w500)),
+                      Text(
+                        [_nowPlaying!['songName'], _nowPlaying!['artistName']].whereType<String>().where((s) => s.isNotEmpty).join(' — '),
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 5),
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('1:54', style: TextStyle(fontSize: 11, color: Colors.white70)),
-                    Text('4:12', style: TextStyle(fontSize: 11, color: Colors.white70)),
-                  ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
+                  child: const Text('🔴 LIVE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
                 ),
               ],
             ),
           ),
+          if (_nowPlaying != null) const SizedBox(height: 16),
 
           const SizedBox(height: 20),
 
@@ -1158,21 +1204,70 @@ class _DJRoomTabState extends State<_DJRoomTab> {
 
           const SizedBox(height: 20),
 
-          // Request queue
-          Text(
-            'Recent Requests',
-            style: TextStyle(
-              fontFamily: 'PlusJakartaSans',
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-            ),
+          // Request queue (real data)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Song Requests',
+                style: TextStyle(fontFamily: 'PlusJakartaSans', fontSize: 15, fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)),
+              if (_loading)
+                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.purple)),
+            ],
           ),
           const SizedBox(height: 10),
-          ..._djRoomRequests.map((r) => _RoomRequestTile(req: r, isDark: isDark)),
+          if (_queue.isEmpty && !_loading)
+            Center(child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text('No requests yet. Be the first!',
+                  style: TextStyle(color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight)),
+            ))
+          else
+            ..._queue.map((r) {
+              final reqId = r['requestId'] as String? ?? '';
+              final song = [r['songName'], r['artistName']].whereType<String>().where((s) => s.isNotEmpty).join(' — ');
+              final votes = (r['votes'] as num?)?.toInt() ?? 0;
+              final tip = (r['tipAmount'] as num?)?.toInt() ?? (r['tip'] as num?)?.toInt() ?? 0;
+              final voted = _votedIds.contains(reqId);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.bgCardDark : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+                ),
+                child: Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(song, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)),
+                    if (tip > 0)
+                      Text('KES $tip tip', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.cyan)),
+                  ])),
+                  GestureDetector(
+                    onTap: () { HapticFeedback.selectionClick(); _vote(reqId); },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: voted ? AppColors.purple.withOpacity(0.12) : (isDark ? AppColors.bgElevatedDark : AppColors.bgElevatedLight),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: voted ? AppColors.purple.withOpacity(0.3) : (isDark ? AppColors.borderDark : AppColors.borderLight)),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        HugeIcon(icon: HugeIcons.strokeRoundedThumbsUp, size: 14,
+                            color: voted ? AppColors.purple : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight)),
+                        const SizedBox(width: 4),
+                        Text('$votes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                            color: voted ? AppColors.purple : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight))),
+                      ]),
+                    ),
+                  ),
+                ]),
+              );
+            }),
+          const SizedBox(height: 32),
         ],
-      ),
-    );
+      );
   }
 }
 

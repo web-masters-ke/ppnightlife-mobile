@@ -1491,7 +1491,9 @@ class _SettingsTabState extends State<_SettingsTab> {
   final _addressCtrl = TextEditingController(text: 'Westlands, Nairobi');
   final _capacityCtrl = TextEditingController(text: '200');
   bool _saving = false;
+  bool _toggling = false;
   String? _venueId;
+  String _venueStatus = 'active';
 
   final List<String> _photos = ['🎉', '🎵', '🏛️', '🔥'];
   final List<_MockDJSlot> _djSlots = [
@@ -1526,9 +1528,32 @@ class _SettingsTabState extends State<_SettingsTab> {
           if (v['phone'] != null) _phoneCtrl.text = v['phone'] as String;
           if (v['address'] != null) _addressCtrl.text = v['address'] as String;
           if (v['capacity'] != null) _capacityCtrl.text = '${v['capacity']}';
+          if (v['status'] != null) _venueStatus = v['status'] as String;
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _toggleStatus() async {
+    if (_venueId == null) return;
+    setState(() => _toggling = true);
+    HapticFeedback.lightImpact();
+    try {
+      final res = await ApiService().toggleVenueStatus(_venueId!);
+      final data = res.data['data'] as Map<String, dynamic>?;
+      if (data != null && mounted) {
+        setState(() => _venueStatus = data['status'] as String? ?? _venueStatus);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to update status: $e'),
+          backgroundColor: AppColors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+    if (mounted) setState(() => _toggling = false);
   }
 
   Future<void> _save() async {
@@ -1563,6 +1588,93 @@ class _SettingsTabState extends State<_SettingsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Venue On/Off Toggle ──────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.bgCardDark : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: _venueStatus == 'active'
+                        ? AppColors.green.withOpacity(0.15)
+                        : AppColors.red.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: HugeIcon(
+                    icon: HugeIcons.strokeRoundedPowerSocket01,
+                    size: 20,
+                    color: _venueStatus == 'active' ? AppColors.green : AppColors.red,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Venue Status',
+                        style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600,
+                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                        )),
+                      const SizedBox(height: 2),
+                      Text(
+                        _venueStatus == 'active'
+                            ? 'Open — visible to party goers'
+                            : _venueStatus == 'inactive'
+                                ? 'Closed — hidden from discovery'
+                                : 'Status: $_venueStatus',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _venueStatus == 'active' ? AppColors.green : AppColors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_venueStatus == 'suspended')
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.orange.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('Suspended', style: TextStyle(fontSize: 11, color: AppColors.orange, fontWeight: FontWeight.w600)),
+                  )
+                else
+                  GestureDetector(
+                    onTap: _toggling ? null : _toggleStatus,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 48, height: 26,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: _venueStatus == 'active' ? AppColors.green : (isDark ? AppColors.bgElevatedDark : AppColors.bgElevatedLight),
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+                      ),
+                      child: _toggling
+                          ? Center(child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white)))
+                          : AnimatedAlign(
+                              duration: const Duration(milliseconds: 200),
+                              alignment: _venueStatus == 'active' ? Alignment.centerRight : Alignment.centerLeft,
+                              child: Container(
+                                width: 20, height: 20,
+                                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                              ),
+                            ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
           _SectionTitle('Venue Photos', isDark: isDark),
           const SizedBox(height: 10),
           SizedBox(

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_model.dart';
 import '../services/storage_service.dart';
@@ -112,11 +113,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   String _errorMessage(dynamic e) {
-    if (e is Exception) {
-      final str = e.toString();
-      if (str.contains('401') || str.contains('Unauthorized')) return 'Invalid email or password';
-      if (str.contains('409') || str.contains('already')) return 'Account already exists';
-      if (str.contains('SocketException') || str.contains('Connection')) return 'No internet connection';
+    if (e is DioException) {
+      // Network-level error (no connection, timeout)
+      if (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        return 'No internet connection. Check your network and try again.';
+      }
+      // API returned an error response — extract the message
+      final data = e.response?.data;
+      if (data is Map) {
+        final msg = data['error']?['message'] as String? ??
+            data['message'] as String?;
+        if (msg != null && msg.isNotEmpty) return msg;
+      }
+      final status = e.response?.statusCode;
+      if (status == 401) return 'Invalid email or password';
+      if (status == 409) return 'Account already exists';
+    }
+    final str = e.toString();
+    if (str.contains('SocketException') || str.contains('Connection refused')) {
+      return 'Cannot reach server. Try again later.';
     }
     return 'Something went wrong. Try again.';
   }

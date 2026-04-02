@@ -26,7 +26,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final List<_MediaItem> _images = [];
   _MediaItem? _video;
 
-  bool _uploading = false;
+  int _uploadingCount = 0;
+  bool get _uploading => _uploadingCount > 0;
   bool _posting = false;
   double _uploadProgress = 0;
 
@@ -79,25 +80,31 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   Future<void> _pickImages() async {
     if (_images.length >= _maxImages) return;
     try {
-      final xfile = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
+      final remaining = _maxImages - _images.length;
+      final picked = await ImagePicker().pickMultiImage(
         imageQuality: 85,
         maxWidth: 1280,
+        limit: remaining,
       );
-      if (xfile == null) return;
+      if (picked.isEmpty) return;
 
-      final bytes = await xfile.readAsBytes();
-      final item = _MediaItem(bytes: bytes, name: xfile.name);
-      setState(() => _images.add(item));
-      await _uploadImage(item);
+      final newItems = <_MediaItem>[];
+      for (final xfile in picked) {
+        final bytes = await xfile.readAsBytes();
+        final item = _MediaItem(bytes: bytes, name: xfile.name);
+        newItems.add(item);
+      }
+      setState(() => _images.addAll(newItems));
+      // Upload all picked images in parallel
+      await Future.wait(newItems.map(_uploadImage));
     } catch (_) {
-      _showError('Failed to pick image');
+      _showError('Failed to pick images');
     }
   }
 
   Future<void> _uploadImage(_MediaItem item) async {
     setState(() {
-      _uploading = true;
+      _uploadingCount++;
       _uploadProgress = 0;
     });
     try {
@@ -108,7 +115,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       if (mounted) {
         setState(() {
           item.url = url;
-          _uploading = false;
+          _uploadingCount--;
           _uploadProgress = 1;
         });
       }
@@ -116,7 +123,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       if (mounted) {
         setState(() {
           _images.remove(item);
-          _uploading = false;
+          _uploadingCount--;
         });
         _showError('Failed to upload image');
       }
@@ -139,7 +146,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   Future<void> _uploadVideo(_MediaItem item) async {
     setState(() {
-      _uploading = true;
+      _uploadingCount++;
       _uploadProgress = 0;
     });
     try {
@@ -148,7 +155,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       if (mounted) {
         setState(() {
           item.url = url;
-          _uploading = false;
+          _uploadingCount--;
           _uploadProgress = 1;
         });
       }
@@ -156,7 +163,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       if (mounted) {
         setState(() {
           _video = null;
-          _uploading = false;
+          _uploadingCount--;
         });
         _showError('Failed to upload video');
       }

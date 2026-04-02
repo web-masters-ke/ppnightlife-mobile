@@ -108,12 +108,13 @@ class ApiService {
   }
 
   // ── Venues ────────────────────────────────────────────────────────────────
-  Future<Response> getVenues({String? area, String? search, int limit = 20, int offset = 0}) =>
+  Future<Response> getVenues({String? area, String? search, int limit = 20, int offset = 0, String status = 'active'}) =>
       _dio.get('/venues', queryParameters: {
         if (area != null) 'area': area,
         if (search != null && search.isNotEmpty) 'search': search,
         'limit': limit,
         'offset': offset,
+        'status': status,
       });
   Future<Response> getVenue(String id) => _dio.get('/venues/$id');
   Future<Response> getNearbyVenues(double lat, double lng, {double radius = 5000}) =>
@@ -123,6 +124,9 @@ class ApiService {
       _dio.put('/venues/$id', data: data);
   Future<Response> getOwnedVenues() => _dio.get('/venues/mine');
   Future<Response> getVenueAnalytics(String venueId) => _dio.get('/venues/$venueId/analytics');
+  /// Toggle venue on/off. Optionally pass [status] ('active'|'inactive') to set explicitly.
+  Future<Response> toggleVenueStatus(String venueId, {String? status}) =>
+      _dio.patch('/venues/$venueId/toggle-status', data: status != null ? {'status': status} : {});
 
   // ── Check-in ──────────────────────────────────────────────────────────────
   Future<Response> getCheckinStatus() => _dio.get('/checkin/status');

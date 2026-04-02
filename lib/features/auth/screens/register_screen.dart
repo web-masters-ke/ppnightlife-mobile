@@ -142,8 +142,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SingleTick
       resizeToAvoidBottomInset: true,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
+          statusBarColor: AppColors.bgDark,
           statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
           systemNavigationBarColor: AppColors.bgDark,
           systemNavigationBarIconBrightness: Brightness.light,
         ),

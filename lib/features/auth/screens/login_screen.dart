@@ -8,24 +8,21 @@ import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/pp_text_field.dart';
 import '../../../core/providers/auth_provider.dart';
 
-final _demoAccounts = [
-  _Demo(label: 'Party Goer', emoji: '🎉', email: 'partygoer@demo.pp', password: 'demo1234', color: AppColors.purple),
-  _Demo(label: 'Venue Owner', emoji: '🏛️', email: 'venue@demo.pp', password: 'demo1234', color: AppColors.cyan),
-  _Demo(label: 'DJ', emoji: '🎵', email: 'dj@demo.pp', password: 'demo1234', color: AppColors.pink),
-  _Demo(label: 'Advertiser', emoji: '📣', email: 'ads@demo.pp', password: 'demo1234', color: AppColors.orange),
-];
-
-class _Demo {
-  final String label, emoji, email, password;
-  final Color color;
-  const _Demo({required this.label, required this.emoji, required this.email, required this.password, required this.color});
-}
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
+
+// ── Demo credentials ────────────────────────────────────────────────────────
+const _kDemoPassword = 'PPdemo2026!';
+const _kDemoAccounts = [
+  (label: 'Party Goer',       email: 'alex@ppnightlife.demo',  color: Color(0xFF6C5CE7)),
+  (label: 'DJ',               email: 'dj@ppnightlife.demo',    color: Color(0xFFE040FB)),
+  (label: 'Venue Owner',      email: 'venue@ppnightlife.demo', color: Color(0xFF10B981)),
+  (label: 'Campaign Manager', email: 'ads@ppnightlife.demo',   color: Color(0xFFFF8C42)),
+];
 
 class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
@@ -114,8 +111,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
       resizeToAvoidBottomInset: false,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
+          statusBarColor: AppColors.bgDark,
           statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
           systemNavigationBarColor: AppColors.bgCardDark,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
@@ -255,48 +253,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
 
                           GradientButton(label: 'Sign In', onTap: _login, isLoading: _loading, height: 44),
 
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 14),
 
-                          // Demo accounts divider
+                          // ── Demo Accounts ──────────────────────────────────
                           Row(children: [
-                            Expanded(child: Divider(color: Colors.white.withOpacity(0.07))),
-                            Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text('Demo accounts',
-                                style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.28)))),
-                            Expanded(child: Divider(color: Colors.white.withOpacity(0.07))),
+                            Expanded(child: Divider(color: Colors.white.withOpacity(0.1), thickness: 1)),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              child: Text('DEMO ACCOUNTS',
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.0, color: Colors.white.withOpacity(0.3))),
+                            ),
+                            Expanded(child: Divider(color: Colors.white.withOpacity(0.1), thickness: 1)),
                           ]),
-
                           const SizedBox(height: 8),
-
-                          // Demo tiles — one row
-                          Row(
-                            children: _demoAccounts.asMap().entries.map((e) {
-                              final i = e.key; final acc = e.value;
-                              return Expanded(
-                                child: GestureDetector(
-                                  onTap: () => setState(() {
-                                    _emailCtrl.text = acc.email;
-                                    _passCtrl.text = acc.password;
-                                  }),
-                                  child: Container(
-                                    margin: EdgeInsets.only(right: i < _demoAccounts.length - 1 ? 6 : 0),
-                                    padding: const EdgeInsets.symmetric(vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: acc.color.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(9),
-                                      border: Border.all(color: acc.color.withOpacity(0.28))),
-                                    child: Column(children: [
-                                      Text(acc.emoji, style: const TextStyle(fontSize: 15)),
-                                      const SizedBox(height: 2),
-                                      Text(acc.label, style: TextStyle(fontSize: 8,
-                                        fontWeight: FontWeight.w600, color: acc.color),
-                                        textAlign: TextAlign.center, maxLines: 1,
-                                        overflow: TextOverflow.ellipsis),
-                                    ]),
-                                  ),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: _kDemoAccounts.map((d) => GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _emailCtrl.text = d.email;
+                                  _passCtrl.text = _kDemoPassword;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: d.color.withOpacity(0.10),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: d.color.withOpacity(0.3)),
                                 ),
-                              );
-                            }).toList(),
+                                child: Text(d.label,
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: d.color)),
+                              ),
+                            )).toList(),
+                          ),
+                          const SizedBox(height: 6),
+                          Center(
+                            child: Text('Tap a role to auto-fill · pw: $_kDemoPassword',
+                              style: TextStyle(fontSize: 9.5, color: Colors.white.withOpacity(0.28))),
                           ),
 
                           const SizedBox(height: 10),

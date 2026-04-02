@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/api_service.dart';
 
@@ -27,12 +29,8 @@ class FeedPostCard extends StatefulWidget {
 }
 
 class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMixin {
-  bool _liked = false;
-  int _likes = 0;
   String? _myReaction;
   Map<String, int> _reactionCounts = {};
-  late AnimationController _heartController;
-  late Animation<double> _heartScale;
   late AnimationController _reactionPopController;
   late Animation<double> _reactionPopScale;
   bool _showReactionBar = false;
@@ -41,46 +39,26 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _likes = widget.post.likes as int;
-    // Seed some reactions for mock posts
+    final likes = widget.post.likes as int;
+    // Seed reactions from like count
     _reactionCounts = {
-      '❤️': (_likes * 0.4).round(),
-      '🔥': (_likes * 0.3).round(),
-      '💜': (_likes * 0.15).round(),
-      '🎉': (_likes * 0.1).round(),
+      if (likes > 0) '❤️': (likes * 0.4).round(),
+      if (likes > 0) '🔥': (likes * 0.3).round(),
+      if (likes > 0) '💜': (likes * 0.15).round(),
+      if (likes > 0) '🎉': (likes * 0.1).round(),
     };
-    _heartController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
-    _heartScale = TweenSequence([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.4), weight: 40),
-      TweenSequenceItem(tween: Tween(begin: 1.4, end: 1.0), weight: 60),
-    ]).animate(CurvedAnimation(parent: _heartController, curve: Curves.easeInOut));
-
     _reactionPopController = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
     _reactionPopScale = CurvedAnimation(parent: _reactionPopController, curve: Curves.elasticOut);
   }
 
   @override
   void dispose() {
-    _heartController.dispose();
     _reactionPopController.dispose();
     super.dispose();
   }
 
   String? get _postId {
     try { return widget.post.postId as String?; } catch (_) { return null; }
-  }
-
-  void _toggleLike() {
-    HapticFeedback.lightImpact();
-    setState(() {
-      _liked = !_liked;
-      _likes += _liked ? 1 : -1;
-    });
-    if (_liked) _heartController.forward(from: 0);
-    final id = _postId;
-    if (id != null && id.isNotEmpty) {
-      ApiService().reactPost(id, 'love').catchError((_) {});
-    }
   }
 
   void _onReactionTap(String emoji) {
@@ -109,15 +87,6 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
     }
   }
 
-  void _onLongPressLike() {
-    HapticFeedback.mediumImpact();
-    setState(() => _showReactionBar = !_showReactionBar);
-    if (_showReactionBar) {
-      _reactionPopController.forward(from: 0);
-    } else {
-      _reactionPopController.reverse();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -356,8 +325,8 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
             ),
           ),
 
-          // Media
-          if (post.isImage as bool) ...[
+          // Media (images or video)
+          if ((post.isImage as bool) || (post.isVideo as bool)) ...[
             const SizedBox(height: 10),
             _PostMediaGrid(
               urls: (() {
@@ -368,125 +337,109 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
                   return <String>[];
                 } catch (_) { return <String>[]; }
               })(),
+              isVideo: post.isVideo as bool,
               isDark: isDark,
             ),
           ],
 
-          // Reaction summary row
-          if (_reactionCounts.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Row(
-                children: [
-                  // Top 3 reaction emojis
-                  ...(() {
-                    final sorted = _reactionCounts.entries.toList()
-                      ..sort((a, b) => b.value.compareTo(a.value));
-                    return sorted.take(3).map((e) => Text(e.key, style: const TextStyle(fontSize: 14)));
-                  })(),
-                  const SizedBox(width: 5),
-                  Text(
-                    _formatCount(_reactionCounts.values.fold(0, (a, b) => a + b)),
-                    style: TextStyle(fontSize: 12, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
-                  ),
-                ],
-              ),
-            ),
-          ],
 
-          // Reaction picker bar (shown on long press)
+          // ── Emoji picker (shown when React tapped) ───────────────────────
           AnimatedSize(
-            duration: const Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 180),
             child: _showReactionBar
                 ? Padding(
                     padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
                     child: ScaleTransition(
                       scale: _reactionPopScale,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.bgCardDark : Colors.white,
-                          borderRadius: BorderRadius.circular(28),
-                          border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 12, offset: const Offset(0, 4)),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: _reactions.map((r) => GestureDetector(
+                      child: Wrap(
+                        spacing: 4,
+                        children: _reactions.map((r) {
+                          final isActive = _myReaction == r.$1;
+                          final count = _reactionCounts[r.$1] ?? 0;
+                          return GestureDetector(
                             onTap: () => _onReactionTap(r.$1),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 150),
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              padding: const EdgeInsets.all(6),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                               decoration: BoxDecoration(
-                                color: _myReaction == r.$1 ? AppColors.purple.withOpacity(0.15) : Colors.transparent,
-                                shape: BoxShape.circle,
+                                color: isActive
+                                    ? AppColors.purple.withValues(alpha: 0.15)
+                                    : isDark ? AppColors.bgElevatedDark : AppColors.bgElevatedLight,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isActive
+                                      ? AppColors.purple.withValues(alpha: 0.4)
+                                      : Colors.transparent,
+                                ),
                               ),
-                              child: Text(
-                                r.$1,
-                                style: TextStyle(fontSize: _myReaction == r.$1 ? 26 : 22),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(r.$1, style: TextStyle(fontSize: isActive ? 22 : 20)),
+                                  if (count > 0) ...[
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      _formatCount(count),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.purple,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
-                          )).toList(),
-                        ),
+                          );
+                        }).toList(),
                       ),
                     ),
                   )
                 : const SizedBox.shrink(),
           ),
 
-          const SizedBox(height: 8),
-
-          // Actions
+          // ── Action bar ───────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
             child: Row(
               children: [
-                // Like / Reaction
+                // React — icon + count
                 GestureDetector(
-                  onTap: _myReaction != null ? () => _onReactionTap(_myReaction!) : _toggleLike,
-                  onLongPress: _onLongPressLike,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    setState(() => _showReactionBar = !_showReactionBar);
+                    if (_showReactionBar) {
+                      _reactionPopController.forward(from: 0);
+                    } else {
+                      _reactionPopController.reverse();
+                    }
+                  },
                   child: Row(
                     children: [
-                      AnimatedBuilder(
-                        animation: _heartController,
-                        builder: (context, child) => Transform.scale(
-                          scale: _myReaction != null ? 1.0 : _heartScale.value,
-                          child: _myReaction != null
-                              ? Text(_myReaction!, style: const TextStyle(fontSize: 22))
-                              : HugeIcon(
-                                  icon: HugeIcons.strokeRoundedFavourite,
-                                  size: 22,
-                                  color: _liked ? AppColors.red : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        child: Text(
-                          _formatCount(_likes),
-                          key: ValueKey(_likes),
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: (_liked || _myReaction != null)
-                                ? AppColors.purple
-                                : isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondaryLight,
-                          ),
+                      _myReaction != null
+                          ? Text(_myReaction!, style: const TextStyle(fontSize: 18, height: 1))
+                          : HugeIcon(
+                              icon: HugeIcons.strokeRoundedFavourite,
+                              size: 20,
+                              color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                            ),
+                      const SizedBox(width: 5),
+                      Text(
+                        _formatCount(_reactionCounts.values.fold(0, (a, b) => a + b)),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: _myReaction != null
+                              ? AppColors.purple
+                              : isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 20),
 
-                // Comment
+                // Comment — icon + count
                 GestureDetector(
                   onTap: () {
                     final id = _postId;
@@ -499,7 +452,7 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
                         size: 20,
                         color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 5),
                       Text(
                         _formatCount(post.comments as int),
                         style: TextStyle(
@@ -511,9 +464,9 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 20),
 
-                // Share
+                // Share — icon only
                 GestureDetector(
                   onTap: () {
                     final id = _postId;
@@ -532,7 +485,7 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
 
                 const Spacer(),
 
-                // Bookmark
+                // Bookmark — icon only, right-aligned
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.selectionClick();
@@ -545,9 +498,13 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
                     ));
                   },
                   child: HugeIcon(
-                    icon: _bookmarked ? HugeIcons.strokeRoundedBookmark02 : HugeIcons.strokeRoundedBookmark01,
+                    icon: _bookmarked
+                        ? HugeIcons.strokeRoundedBookmark02
+                        : HugeIcons.strokeRoundedBookmark01,
                     size: 20,
-                    color: _bookmarked ? AppColors.purple : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
+                    color: _bookmarked
+                        ? AppColors.orange
+                        : isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
                   ),
                 ),
               ],
@@ -564,11 +521,185 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
   }
 }
 
+
+// ── Inline video player — thumbnail first, loads only on tap ─────────────────
+// Shows a static thumbnail instantly with no network cost.
+// Video controller is only created when the user taps play — zero preloading.
+// Controller is disposed when the widget leaves the tree (scroll away = free memory).
+class _FeedVideoPlayer extends StatefulWidget {
+  final String url;
+  const _FeedVideoPlayer({required this.url});
+  @override
+  State<_FeedVideoPlayer> createState() => _FeedVideoPlayerState();
+}
+
+class _FeedVideoPlayerState extends State<_FeedVideoPlayer> {
+  VideoPlayerController? _controller;
+  bool _loading = false;   // initialising the controller
+  bool _playing = false;   // controller ready + playing
+  bool _error   = false;
+  bool _muted   = false;
+
+  // Thumbnail = video URL with an ?thumb query param stripped (S3 videos serve
+  // their own first frame) or we just show a dark placeholder immediately.
+  // Either way we show SOMETHING before any network call.
+
+  Future<void> _startPlayback() async {
+    if (_loading || _playing) return;
+    setState(() { _loading = true; _error = false; });
+    try {
+      final c = VideoPlayerController.networkUrl(
+        Uri.parse(widget.url),
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+      _controller = c;
+      await c.initialize();
+      if (!mounted) { c.dispose(); return; }
+      await c.setLooping(true);
+      await c.setVolume(_muted ? 0 : 1);
+      await c.play();
+      setState(() { _playing = true; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _error = true; _loading = false; });
+    }
+  }
+
+  void _togglePlay() {
+    final c = _controller;
+    if (c == null) return;
+    setState(() { c.value.isPlaying ? c.pause() : c.play(); });
+  }
+
+  void _toggleMute() {
+    setState(() => _muted = !_muted);
+    _controller?.setVolume(_muted ? 0 : 1);
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // ── Error state ──────────────────────────────────────────────────────
+    if (_error) {
+      return Container(
+        height: 260,
+        color: Colors.black,
+        child: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.videocam_off_rounded, color: Colors.white38, size: 36),
+              SizedBox(height: 8),
+              Text('Could not load video', style: TextStyle(color: Colors.white38, fontSize: 12)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ── Thumbnail / not-yet-started ──────────────────────────────────────
+    if (!_playing) {
+      return GestureDetector(
+        onTap: _startPlayback,
+        child: Container(
+          color: Colors.black,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Try to show thumbnail — silently fails for raw video URLs
+              CachedNetworkImage(
+                imageUrl: widget.url,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+              ),
+              Container(color: Colors.black.withValues(alpha: 0.30)),
+              Center(
+                child: _loading
+                    ? const SizedBox(
+                        width: 44, height: 44,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                      )
+                    : Container(
+                        decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                        padding: const EdgeInsets.all(14),
+                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 44),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ── Playing ──────────────────────────────────────────────────────────
+    final c = _controller!;
+    return AnimatedBuilder(
+      animation: c,
+      builder: (_, __) => GestureDetector(
+        onTap: _togglePlay,
+        child: Stack(
+          fit: StackFit.expand,
+          alignment: Alignment.center,
+          children: [
+            FittedBox(
+              fit: BoxFit.cover,
+              clipBehavior: Clip.hardEdge,
+              child: SizedBox(
+                width: c.value.size.width > 0 ? c.value.size.width : 9,
+                height: c.value.size.height > 0 ? c.value.size.height : 16,
+                child: VideoPlayer(c),
+              ),
+            ),
+            if (!c.value.isPlaying)
+              Container(
+                decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
+                padding: const EdgeInsets.all(14),
+                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 44),
+              ),
+            // Mute toggle — bottom right
+            Positioned(
+              bottom: 12, right: 12,
+              child: GestureDetector(
+                onTap: _toggleMute,
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                  child: Icon(
+                    _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                    color: Colors.white, size: 18,
+                  ),
+                ),
+              ),
+            ),
+            // Scrubable progress bar at bottom
+            Positioned(
+              bottom: 0, left: 0, right: 0,
+              child: VideoProgressIndicator(
+                c, allowScrubbing: true, padding: EdgeInsets.zero,
+                colors: const VideoProgressColors(
+                  playedColor: AppColors.purple,
+                  bufferedColor: Colors.white24,
+                  backgroundColor: Colors.transparent,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Post Media Grid ───────────────────────────────────────────────────────────
 class _PostMediaGrid extends StatelessWidget {
   final List<String> urls;
   final bool isDark;
-  const _PostMediaGrid({required this.urls, required this.isDark});
+  final bool isVideo;
+  const _PostMediaGrid({required this.urls, required this.isDark, this.isVideo = false});
 
   static const double _maxSingleHeight = 480;
   static const double _maxGridHeight = 320;
@@ -576,6 +707,14 @@ class _PostMediaGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (urls.isEmpty) return const SizedBox.shrink();
+
+    // Video post — Instagram-style: edge-to-edge, no border radius, 4:5 aspect ratio
+    if (isVideo) {
+      return AspectRatio(
+        aspectRatio: 4 / 5,
+        child: _FeedVideoPlayer(url: urls.first),
+      );
+    }
 
     final display = urls.take(4).toList();
     final isSingle = display.length == 1;

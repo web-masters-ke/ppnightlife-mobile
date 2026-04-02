@@ -163,10 +163,16 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
     final xpPct = (xp / xpNext).clamp(0.0, 1.0);
     final levelTitle = level < _kLevelTitles.length ? _kLevelTitles[level] : 'Legend';
 
+    // Adaptive colors
+    final headerBg1 = isDark ? const Color(0xFF1A1230) : const Color(0xFFEDE9FF);
+    final headerBg2 = isDark ? AppColors.bgDark : AppColors.bgLight;
+    final appBarIconColor = isDark ? Colors.white : AppColors.purple;
+    final tabBarBg = isDark ? AppColors.bgDark : AppColors.bgLight;
+
     return SliverAppBar(
-      expandedHeight: 320,
+      expandedHeight: 300,
       pinned: true,
-      backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
+      backgroundColor: tabBarBg,
       actions: [
         GestureDetector(
           onTap: () => ref.read(themeProvider.notifier).toggle(),
@@ -187,7 +193,7 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
           ),
         ),
         IconButton(
-          icon: const HugeIcon(icon: HugeIcons.strokeRoundedSettings01, size: 22, color: Colors.white),
+          icon: HugeIcon(icon: HugeIcons.strokeRoundedSettings01, size: 22, color: appBarIconColor),
           onPressed: () {
             showModalBottomSheet(
               context: context,
@@ -198,37 +204,45 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
           },
         ),
       ],
-      bottom: TabBar(
-        controller: tabController,
-        indicatorColor: AppColors.purple,
-        indicatorWeight: 2,
-        isScrollable: true,
-        tabAlignment: TabAlignment.start,
-        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: const TextStyle(fontSize: 13),
-        tabs: const [
-          Tab(text: 'Overview'),
-          Tab(text: 'Posts'),
-          Tab(text: 'Connections'),
-          Tab(text: 'Badges'),
-          Tab(text: 'Activity'),
-        ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(44),
+        child: Container(
+          color: tabBarBg,
+          child: TabBar(
+            controller: tabController,
+            indicatorColor: AppColors.purple,
+            indicatorWeight: 2,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            labelColor: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+            unselectedLabelColor: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+            labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            unselectedLabelStyle: const TextStyle(fontSize: 13),
+            tabs: const [
+              Tab(text: 'Overview'),
+              Tab(text: 'Posts'),
+              Tab(text: 'Connections'),
+              Tab(text: 'Badges'),
+              Tab(text: 'Activity'),
+            ],
+          ),
+        ),
       ),
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
           children: [
             Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF1A1230), AppColors.bgDark],
+                  colors: [headerBg1, headerBg2],
                 ),
               ),
             ),
             Positioned(
-              top: 100,
+              top: 90,
               left: 20,
               right: 20,
               child: Column(
@@ -246,20 +260,29 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: AppColors.primaryGradient,
-                                border: Border.all(color: AppColors.bgDark, width: 3),
+                                border: Border.all(
+                                  color: isDark ? AppColors.bgDark : AppColors.bgLight,
+                                  width: 3,
+                                ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.purple.withOpacity(0.4),
+                                    color: AppColors.purple.withOpacity(0.35),
                                     blurRadius: 16,
                                   ),
                                 ],
                               ),
                               child: _uploadingPhoto
                                   ? const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                  : user?.profilePhoto != null
-                                      ? ClipOval(child: Image.network(user!.profilePhoto!, fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 34, color: Colors.white))))
-                                      : const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 34, color: Colors.white)),
+                                  : ClipOval(
+                                      child: user?.profilePhoto != null && (user!.profilePhoto!).isNotEmpty
+                                          ? Image.network(
+                                              user.profilePhoto!,
+                                              fit: BoxFit.cover,
+                                              width: 76, height: 76,
+                                              errorBuilder: (_, __, ___) => const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 34, color: Colors.white)),
+                                            )
+                                          : const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 34, color: Colors.white)),
+                                    ),
                             ),
                             // Camera overlay
                             Positioned(
@@ -315,7 +338,7 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
                                 Text(
                                   user?.name ?? 'Alex Maina',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: isDark ? Colors.white : AppColors.textPrimaryLight,
                                     fontSize: 20,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -334,9 +357,12 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
                                 ),
                               ],
                             ),
-                                            Text(
+                            Text(
                               user?.username != null ? '@${user!.username}' : (user?.email.split('@').first ?? ''),
-                              style: const TextStyle(color: Colors.white60, fontSize: 13),
+                              style: TextStyle(
+                                color: isDark ? Colors.white60 : AppColors.textMutedLight,
+                                fontSize: 13,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             // Streak badge
@@ -371,9 +397,9 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
                   // XP bar
-                  _XpBar(xpPct: xpPct, xp: xp, xpNext: xpNext, level: level),
+                  _XpBar(xpPct: xpPct, xp: xp, xpNext: xpNext, level: level, isDark: isDark),
                 ],
               ),
             ),
@@ -391,33 +417,29 @@ class _XpBar extends StatelessWidget {
   final int xp;
   final int xpNext;
   final int level;
-  const _XpBar({required this.xpPct, required this.xp, required this.xpNext, required this.level});
+  final bool isDark;
+  const _XpBar({required this.xpPct, required this.xp, required this.xpNext, required this.level, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
+    final textColor = isDark ? Colors.white : AppColors.textPrimaryLight;
+    final mutedColor = isDark ? Colors.white54 : AppColors.textMutedLight;
+    final trackColor = isDark ? Colors.white12 : Colors.black12;
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                ShaderMask(
-                  shaderCallback: (b) => AppColors.primaryGradient.createShader(b),
-                  child: Text(
-                    '⚡ $xp XP',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
+            ShaderMask(
+              shaderCallback: (b) => AppColors.primaryGradient.createShader(b),
+              child: Text(
+                '⚡ $xp XP',
+                style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.w700),
+              ),
             ),
             Text(
               '$xp / $xpNext XP to Lv.${level + 1}',
-              style: const TextStyle(color: Colors.white54, fontSize: 11),
+              style: TextStyle(color: mutedColor, fontSize: 11),
             ),
           ],
         ),
@@ -426,18 +448,12 @@ class _XpBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
           child: Stack(
             children: [
-              Container(
-                height: 6,
-                width: double.infinity,
-                color: Colors.white12,
-              ),
+              Container(height: 6, width: double.infinity, color: trackColor),
               FractionallySizedBox(
                 widthFactor: xpPct.clamp(0.0, 1.0),
                 child: Container(
                   height: 6,
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                  ),
+                  decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
                 ),
               ),
             ],

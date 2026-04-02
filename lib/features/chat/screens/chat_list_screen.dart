@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/providers/auth_provider.dart';
 
 final _chatRoomsProvider = FutureProvider.autoDispose((ref) async {
   final res = await ApiService().getChatRooms();
@@ -212,108 +213,135 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
   }
 
   void _showNewChatSheet(BuildContext context, bool isDark) {
+    final myUserId = ref.read(authProvider).user?.userId ?? '';
     final searchCtrl = TextEditingController();
-    List<Map<String, dynamic>> results = [];
+    List<Map<String, dynamic>> followingList = [];
+    List<Map<String, dynamic>> searchResults = [];
+    bool loading = true;
     bool searching = false;
+    String query = '';
+
+    // Load following list immediately
+    ApiService().getFollowing(myUserId).then((res) {
+      final items = ((res.data['data'] as List?) ?? []).cast<Map<String, dynamic>>();
+      followingList = items;
+    }).catchError((_) {}).whenComplete(() { loading = false; });
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: Container(
-            height: MediaQuery.of(ctx).size.height * 0.7,
-            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.bgElevatedDark : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 36, height: 4,
-                    decoration: BoxDecoration(color: isDark ? AppColors.borderDark : AppColors.borderLight, borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 16),
-                Text('New Conversation',
-                    style: TextStyle(fontFamily: 'PlusJakartaSans', fontSize: 17, fontWeight: FontWeight.w700,
-                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Search users...',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        builder: (ctx, setS) {
+          // Trigger initial rebuild after following list loads
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (ctx.mounted) setS(() {});
+          });
+
+          final displayList = query.isNotEmpty ? searchResults : followingList;
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              height: MediaQuery.of(ctx).size.height * 0.7,
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.bgElevatedDark : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(child: Container(width: 36, height: 4,
+                      decoration: BoxDecoration(color: isDark ? AppColors.borderDark : AppColors.borderLight, borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 16),
+                  Text('New Conversation',
+                      style: TextStyle(fontFamily: 'PlusJakartaSans', fontSize: 17, fontWeight: FontWeight.w700,
+                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)),
+                  const SizedBox(height: 4),
+                  Text('People you follow',
+                      style: TextStyle(fontSize: 12, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight)),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Search people you follow...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                    onChanged: (q) async {
+                      setS(() { query = q; searching = q.isNotEmpty; });
+                      if (q.isEmpty) return;
+                      // Filter following list by name
+                      final filtered = followingList.where((u) {
+                        final name = u['name'] as String? ?? '';
+                        return name.toLowerCase().contains(q.toLowerCase());
+                      }).toList();
+                      setS(() { searchResults = filtered; searching = false; });
+                    },
                   ),
-                  onChanged: (q) async {
-                    if (q.length < 2) { setS(() => results = []); return; }
-                    setS(() => searching = true);
-                    try {
-                      final res = await ApiService().searchUsers(q: q, limit: 10);
-                      setS(() {
-                        results = ((res.data['data']['items'] as List?) ?? []).cast<Map<String, dynamic>>();
-                        searching = false;
-                      });
-                    } catch (_) {
-                      setS(() => searching = false);
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: searching
-                      ? const Center(child: CircularProgressIndicator(color: AppColors.purple))
-                      : results.isEmpty
-                          ? Center(child: Text('Search to find people to message',
-                              style: TextStyle(color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight)))
-                          : ListView.builder(
-                              itemCount: results.length,
-                              itemBuilder: (_, i) {
-                                final u = results[i];
-                                final name = u['name'] as String? ?? 'Unknown';
-                                final role = u['role'] as String? ?? '';
-                                return ListTile(
-                                  leading: Container(
-                                    width: 40, height: 40,
-                                    decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.primaryGradient),
-                                    child: Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
-                                  ),
-                                  title: Text(name, style: TextStyle(fontWeight: FontWeight.w600,
-                                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)),
-                                  subtitle: Text(role, style: TextStyle(fontSize: 12,
-                                      color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight)),
-                                  onTap: () async {
-                                    try {
-                                      final res = await ApiService().openChat(u['userId'] as String);
-                                      final roomId = res.data['data']['roomId'] as String;
-                                      if (ctx.mounted) {
-                                        Navigator.pop(ctx);
-                                        ref.invalidate(_chatRoomsProvider);
-                                        context.push('/chat/$roomId');
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: (loading || searching)
+                        ? const Center(child: CircularProgressIndicator(color: AppColors.purple))
+                        : displayList.isEmpty
+                            ? Center(child: Text(
+                                query.isNotEmpty ? 'No matching contacts' : 'Follow people to start a conversation',
+                                style: TextStyle(color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight)))
+                            : ListView.builder(
+                                itemCount: displayList.length,
+                                itemBuilder: (_, i) {
+                                  final u = displayList[i];
+                                  final name = u['name'] as String? ?? 'Unknown';
+                                  final role = u['role'] as String? ?? '';
+                                  final photo = u['profilePhoto'] as String? ?? u['profile_photo'] as String? ?? '';
+                                  return ListTile(
+                                    leading: Container(
+                                      width: 44, height: 44,
+                                      decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.primaryGradient),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: photo.isNotEmpty
+                                          ? Image.network(photo, fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))))
+                                          : Center(child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
+                                    ),
+                                    title: Text(name, style: TextStyle(fontWeight: FontWeight.w600,
+                                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)),
+                                    subtitle: Text(role.replaceAll('-', ' '), style: TextStyle(fontSize: 12,
+                                        color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight)),
+                                    onTap: () async {
+                                      try {
+                                        final res = await ApiService().openChat(u['userId'] as String? ?? u['user_id'] as String);
+                                        final data = res.data['data'] ?? res.data;
+                                        final roomId = data['roomId'] as String? ?? data['room_id'] as String;
+                                        if (ctx.mounted) {
+                                          Navigator.pop(ctx);
+                                          ref.invalidate(_chatRoomsProvider);
+                                          context.push('/chat/$roomId');
+                                        }
+                                      } catch (e) {
+                                        if (ctx.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                            content: Text('Could not start chat: $e'),
+                                            backgroundColor: AppColors.red,
+                                          ));
+                                        }
                                       }
-                                    } catch (e) {
-                                      if (ctx.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                          content: Text('$e'),
-                                          backgroundColor: AppColors.red,
-                                        ));
-                                      }
-                                    }
-                                  },
-                                );
-                              },
-                            ),
-                ),
-              ],
+                                    },
+                                  );
+                                },
+                              ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
