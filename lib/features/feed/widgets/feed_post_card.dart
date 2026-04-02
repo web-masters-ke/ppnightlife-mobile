@@ -522,10 +522,10 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
 }
 
 
-// ── Inline video player — thumbnail first, loads only on tap ─────────────────
-// Shows a static thumbnail instantly with no network cost.
-// Video controller is only created when the user taps play — zero preloading.
-// Controller is disposed when the widget leaves the tree (scroll away = free memory).
+// ── Inline video player — Instagram-style: auto-initialises immediately, muted ─
+// Controller initialises as soon as the widget is built (like Instagram).
+// Plays muted by default; user taps to unmute/pause.
+// Disposed when widget leaves the tree.
 class _FeedVideoPlayer extends StatefulWidget {
   final String url;
   const _FeedVideoPlayer({required this.url});
@@ -535,18 +535,17 @@ class _FeedVideoPlayer extends StatefulWidget {
 
 class _FeedVideoPlayerState extends State<_FeedVideoPlayer> {
   VideoPlayerController? _controller;
-  bool _loading = false;   // initialising the controller
-  bool _playing = false;   // controller ready + playing
-  bool _error   = false;
-  bool _muted   = false;
+  bool _initialized = false;
+  bool _error       = false;
+  bool _muted       = true;   // start muted like Instagram
 
-  // Thumbnail = video URL with an ?thumb query param stripped (S3 videos serve
-  // their own first frame) or we just show a dark placeholder immediately.
-  // Either way we show SOMETHING before any network call.
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
 
-  Future<void> _startPlayback() async {
-    if (_loading || _playing) return;
-    setState(() { _loading = true; _error = false; });
+  Future<void> _init() async {
     try {
       final c = VideoPlayerController.networkUrl(
         Uri.parse(widget.url),
@@ -556,23 +555,23 @@ class _FeedVideoPlayerState extends State<_FeedVideoPlayer> {
       await c.initialize();
       if (!mounted) { c.dispose(); return; }
       await c.setLooping(true);
-      await c.setVolume(_muted ? 0 : 1);
+      await c.setVolume(0); // muted start
       await c.play();
-      setState(() { _playing = true; _loading = false; });
+      setState(() => _initialized = true);
     } catch (_) {
-      if (mounted) setState(() { _error = true; _loading = false; });
+      if (mounted) setState(() => _error = true);
     }
+  }
+
+  void _toggleMute() {
+    setState(() => _muted = !_muted);
+    _controller?.setVolume(_muted ? 0 : 1);
   }
 
   void _togglePlay() {
     final c = _controller;
     if (c == null) return;
     setState(() { c.value.isPlaying ? c.pause() : c.play(); });
-  }
-
-  void _toggleMute() {
-    setState(() => _muted = !_muted);
-    _controller?.setVolume(_muted ? 0 : 1);
   }
 
   @override
@@ -586,50 +585,25 @@ class _FeedVideoPlayerState extends State<_FeedVideoPlayer> {
     // ── Error state ──────────────────────────────────────────────────────
     if (_error) {
       return Container(
-        height: 260,
         color: Colors.black,
         child: const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.videocam_off_rounded, color: Colors.white38, size: 36),
-              SizedBox(height: 8),
-              Text('Could not load video', style: TextStyle(color: Colors.white38, fontSize: 12)),
-            ],
-          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.videocam_off_rounded, color: Colors.white38, size: 36),
+            SizedBox(height: 8),
+            Text('Could not load video', style: TextStyle(color: Colors.white38, fontSize: 12)),
+          ]),
         ),
       );
     }
 
-    // ── Thumbnail / not-yet-started ──────────────────────────────────────
-    if (!_playing) {
-      return GestureDetector(
-        onTap: _startPlayback,
-        child: Container(
-          color: Colors.black,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Try to show thumbnail — silently fails for raw video URLs
-              CachedNetworkImage(
-                imageUrl: widget.url,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => const SizedBox.shrink(),
-              ),
-              Container(color: Colors.black.withValues(alpha: 0.30)),
-              Center(
-                child: _loading
-                    ? const SizedBox(
-                        width: 44, height: 44,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                      )
-                    : Container(
-                        decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
-                        padding: const EdgeInsets.all(14),
-                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 44),
-                      ),
-              ),
-            ],
+    // ── Loading — show black with spinner while controller initialises ───
+    if (!_initialized) {
+      return Container(
+        color: Colors.black,
+        child: const Center(
+          child: SizedBox(
+            width: 36, height: 36,
+            child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
           ),
         ),
       );
@@ -645,22 +619,24 @@ class _FeedVideoPlayerState extends State<_FeedVideoPlayer> {
           fit: StackFit.expand,
           alignment: Alignment.center,
           children: [
+            // Video fills the 4:5 frame, cover-cropped
             FittedBox(
               fit: BoxFit.cover,
               clipBehavior: Clip.hardEdge,
               child: SizedBox(
-                width: c.value.size.width > 0 ? c.value.size.width : 9,
+                width:  c.value.size.width  > 0 ? c.value.size.width  : 9,
                 height: c.value.size.height > 0 ? c.value.size.height : 16,
                 child: VideoPlayer(c),
               ),
             ),
+            // Pause indicator — only visible when paused
             if (!c.value.isPlaying)
               Container(
                 decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
                 padding: const EdgeInsets.all(14),
                 child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 44),
               ),
-            // Mute toggle — bottom right
+            // Mute toggle — bottom right corner
             Positioned(
               bottom: 12, right: 12,
               child: GestureDetector(
@@ -675,7 +651,7 @@ class _FeedVideoPlayerState extends State<_FeedVideoPlayer> {
                 ),
               ),
             ),
-            // Scrubable progress bar at bottom
+            // Progress bar at bottom
             Positioned(
               bottom: 0, left: 0, right: 0,
               child: VideoProgressIndicator(
@@ -695,100 +671,114 @@ class _FeedVideoPlayerState extends State<_FeedVideoPlayer> {
 }
 
 // ── Post Media Grid ───────────────────────────────────────────────────────────
+// Instagram-style: full-width, no horizontal padding, no border radius.
+// Single/video: 4:5 portrait. Multi: square-ish grid with 2px gaps.
 class _PostMediaGrid extends StatelessWidget {
   final List<String> urls;
   final bool isDark;
   final bool isVideo;
   const _PostMediaGrid({required this.urls, required this.isDark, this.isVideo = false});
 
-  static const double _maxSingleHeight = 480;
-  static const double _maxGridHeight = 320;
-
   @override
   Widget build(BuildContext context) {
     if (urls.isEmpty) return const SizedBox.shrink();
+    final w = MediaQuery.of(context).size.width;
 
-    // Video post — Instagram-style: edge-to-edge, no border radius, 4:5 aspect ratio
+    // ── Video — 4:5 portrait, edge-to-edge, auto-plays muted ────────────
     if (isVideo) {
-      return AspectRatio(
-        aspectRatio: 4 / 5,
+      return SizedBox(
+        width: w,
+        height: w * 5 / 4,
         child: _FeedVideoPlayer(url: urls.first),
       );
     }
 
     final display = urls.take(4).toList();
-    final isSingle = display.length == 1;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: isSingle
-            ? _singleImage(display.first)
-            : _grid(display),
-      ),
-    );
-  }
+    // ── Single image — 4:5 portrait, cover, edge-to-edge ────────────────
+    if (display.length == 1) {
+      return SizedBox(
+        width: w,
+        height: w * 5 / 4,
+        child: _img(display.first),
+      );
+    }
 
-  Widget _singleImage(String url) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: _maxSingleHeight),
-      child: Image.network(
-        url,
-        fit: BoxFit.contain,
-        width: double.infinity,
-        errorBuilder: (_, __, ___) => _placeholder(),
-        loadingBuilder: (_, child, progress) => progress == null
-            ? child
-            : SizedBox(
-                height: 220,
-                child: Center(child: CircularProgressIndicator(
-                  value: progress.expectedTotalBytes != null
-                      ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                      : null,
-                  color: AppColors.purple, strokeWidth: 2,
-                )),
-              ),
-      ),
-    );
-  }
+    // ── 2 images — side by side, square each ────────────────────────────
+    if (display.length == 2) {
+      final h = w / 2;
+      return SizedBox(
+        width: w, height: h,
+        child: Row(children: [
+          SizedBox(width: (w - 2) / 2, height: h, child: _img(display[0])),
+          const SizedBox(width: 2),
+          SizedBox(width: (w - 2) / 2, height: h, child: _img(display[1])),
+        ]),
+      );
+    }
 
-  Widget _grid(List<String> urls) {
+    // ── 3 images — tall left + 2 stacked right ───────────────────────────
+    if (display.length == 3) {
+      final h = w * 0.65;
+      final rightW = (w - 2) / 3;
+      final leftW  = w - rightW - 2;
+      return SizedBox(
+        width: w, height: h,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          SizedBox(width: leftW, child: _img(display[0])),
+          const SizedBox(width: 2),
+          SizedBox(
+            width: rightW,
+            child: Column(children: [
+              SizedBox(height: (h - 2) / 2, child: _img(display[1])),
+              const SizedBox(height: 2),
+              SizedBox(height: (h - 2) / 2, child: _img(display[2])),
+            ]),
+          ),
+        ]),
+      );
+    }
+
+    // ── 4 images — 2×2 grid ──────────────────────────────────────────────
+    final cell = (w - 2) / 2;
     return SizedBox(
-      height: _maxGridHeight,
-      child: GridView.count(
-        crossAxisCount: 2,
-        mainAxisSpacing: 2,
-        crossAxisSpacing: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: urls.asMap().entries.map((e) {
-          final isLast = e.key == urls.length - 1 && urls.length == 4;
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.network(
-                e.value,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _placeholder(),
-              ),
-              if (isLast && urls.length == 4)
-                Container(
-                  color: Colors.black54,
-                  child: const Center(
-                    child: Text('+', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
-                  ),
+      width: w, height: cell * 2 + 2,
+      child: Column(children: [
+        Row(children: [
+          SizedBox(width: cell, height: cell, child: _img(display[0])),
+          const SizedBox(width: 2),
+          SizedBox(width: cell, height: cell, child: _img(display[1])),
+        ]),
+        const SizedBox(height: 2),
+        Row(children: [
+          SizedBox(width: cell, height: cell, child: _img(display[2])),
+          const SizedBox(width: 2),
+          SizedBox(
+            width: cell, height: cell,
+            child: Stack(fit: StackFit.expand, children: [
+              _img(display[3]),
+              Container(
+                color: Colors.black54,
+                child: const Center(
+                  child: Text('+', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
                 ),
-            ],
-          );
-        }).toList(),
-      ),
+              ),
+            ]),
+          ),
+        ]),
+      ]),
     );
   }
 
-  Widget _placeholder() => Container(
-    height: 220,
-    color: AppColors.purple.withValues(alpha: 0.15),
-    child: const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, size: 40, color: Colors.white38)),
+  Widget _img(String url) => CachedNetworkImage(
+    imageUrl: url,
+    fit: BoxFit.cover,
+    width: double.infinity,
+    height: double.infinity,
+    placeholder: (_, __) => Container(color: Colors.black12),
+    errorWidget: (_, __, ___) => Container(
+      color: AppColors.purple.withValues(alpha: 0.15),
+      child: const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, size: 40, color: Colors.white38)),
+    ),
   );
 }

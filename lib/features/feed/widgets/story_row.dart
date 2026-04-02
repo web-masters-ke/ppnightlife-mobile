@@ -356,7 +356,10 @@ class _StoryViewerState extends State<_StoryViewer> with SingleTickerProviderSta
     final postId = _current['postId'] as String? ?? '';
     if (postId.isNotEmpty) {
       ApiService().viewStatus(postId).ignore();
-      widget.onSeen(postId);
+      // Defer onSeen so it doesn't trigger setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onSeen(postId);
+      });
       final myId = widget.myUserId;
       final authorId = (_current['author'] as Map?)?.get('userId') as String? ?? _current['userId'] as String? ?? '';
       if (myId == authorId) _loadViewers(postId);
