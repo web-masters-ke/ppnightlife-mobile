@@ -106,7 +106,7 @@ class _StoryRowState extends ConsumerState<StoryRow> {
     final me = ref.watch(authProvider).user;
 
     return SizedBox(
-      height: 110,
+      height: 124,
       child: _loading
           ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.purple)))
           : ListView.builder(
@@ -152,7 +152,7 @@ class _AddStoryButton extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  width: 72, height: 72,
+                  width: 84, height: 84,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isDark ? AppColors.bgElevatedDark : AppColors.bgElevatedLight,

@@ -170,7 +170,7 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
     final tabBarBg = isDark ? AppColors.bgDark : AppColors.bgLight;
 
     return SliverAppBar(
-      expandedHeight: 300,
+      expandedHeight: 265,
       pinned: true,
       backgroundColor: tabBarBg,
       actions: [
@@ -212,6 +212,7 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
             controller: tabController,
             indicatorColor: AppColors.purple,
             indicatorWeight: 2,
+            dividerColor: Colors.transparent,
             isScrollable: true,
             tabAlignment: TabAlignment.start,
             labelColor: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
@@ -242,7 +243,7 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
               ),
             ),
             Positioned(
-              top: 90,
+              top: 80,
               left: 20,
               right: 20,
               child: Column(

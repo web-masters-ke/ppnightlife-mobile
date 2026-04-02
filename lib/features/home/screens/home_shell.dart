@@ -52,59 +52,58 @@ class HomeShell extends ConsumerWidget {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
-        statusBarColor: isDark ? AppColors.bgDark : AppColors.bgLight,
+        statusBarColor: Colors.transparent,
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         systemNavigationBarColor: navBarColor,
         systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarContrastEnforced: false,
       ),
       child: Scaffold(
+        backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
         body: child,
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.bgCardDark : AppColors.bgCardLight,
-            border: Border(top: BorderSide(color: isDark ? AppColors.borderDark : AppColors.borderLight, width: 0.5)),
-            boxShadow: [
-              BoxShadow(
-                color: isDark ? Colors.black.withOpacity(0.3) : AppColors.purple.withOpacity(0.05),
-                blurRadius: 20,
-                offset: const Offset(0, -4),
+        bottomNavigationBar: ColoredBox(
+          color: navBarColor,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(height: 0.5, color: isDark ? AppColors.borderDark : AppColors.borderLight),
+              SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: 58,
+                  child: Row(
+                    children: [
+                      _NavItem(icon: HugeIcons.strokeRoundedHome01, activeIcon: HugeIcons.strokeRoundedHome09, label: 'Home', index: 0, currentIndex: currentIndex, onTap: () => _onNavTap(context, 0), isDark: isDark),
+                      _NavItem(icon: HugeIcons.strokeRoundedLocation01, activeIcon: HugeIcons.strokeRoundedLocation04, label: 'Venues', index: 1, currentIndex: currentIndex, onTap: () => _onNavTap(context, 1), isDark: isDark),
+                      // Center post button
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _showCreatePost(context),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 44, height: 44,
+                                decoration: const BoxDecoration(
+                                  gradient: AppColors.primaryGradient,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [BoxShadow(color: Color(0x556C5CE7), blurRadius: 12, offset: Offset(0, 4))],
+                                ),
+                                child: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01, size: 24, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      _NavItem(icon: HugeIcons.strokeRoundedMessage01, activeIcon: HugeIcons.strokeRoundedMessage02, label: 'Chat', index: 2, currentIndex: currentIndex, onTap: () => _onNavTap(context, 2), isDark: isDark, badge: unread),
+                      _NavItem(icon: HugeIcons.strokeRoundedUser, activeIcon: HugeIcons.strokeRoundedUserCircle, label: 'Profile', index: 4, currentIndex: currentIndex, onTap: () => _onNavTap(context, 4), isDark: isDark),
+                    ],
+                  ),
+                ),
               ),
             ],
-          ),
-          child: SafeArea(
-            child: SizedBox(
-              height: 58,
-              child: Row(
-                children: [
-                  _NavItem(icon: HugeIcons.strokeRoundedHome01, activeIcon: HugeIcons.strokeRoundedHome09, label: 'Home', index: 0, currentIndex: currentIndex, onTap: () => _onNavTap(context, 0), isDark: isDark),
-                  _NavItem(icon: HugeIcons.strokeRoundedLocation01, activeIcon: HugeIcons.strokeRoundedLocation04, label: 'Venues', index: 1, currentIndex: currentIndex, onTap: () => _onNavTap(context, 1), isDark: isDark),
-                  // Center post button
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _showCreatePost(context),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 44, height: 44,
-                            decoration: const BoxDecoration(
-                              gradient: AppColors.primaryGradient,
-                              shape: BoxShape.circle,
-                              boxShadow: [BoxShadow(color: Color(0x556C5CE7), blurRadius: 12, offset: Offset(0, 4))],
-                            ),
-                            child: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01, size: 24, color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  _NavItem(icon: HugeIcons.strokeRoundedMessage01, activeIcon: HugeIcons.strokeRoundedMessage02, label: 'Chat', index: 2, currentIndex: currentIndex, onTap: () => _onNavTap(context, 2), isDark: isDark, badge: unread),
-                  _NavItem(icon: HugeIcons.strokeRoundedUser, activeIcon: HugeIcons.strokeRoundedUserCircle, label: 'Profile', index: 4, currentIndex: currentIndex, onTap: () => _onNavTap(context, 4), isDark: isDark),
-                ],
-              ),
-            ),
           ),
         ),
       ),
