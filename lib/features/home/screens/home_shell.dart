@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/services/api_service.dart';
+import '../../feed/screens/create_post_screen.dart';
 
 // Provider for unread chat count — refreshed on shell mount
 final _unreadCountProvider = FutureProvider<int>((ref) async {
@@ -217,11 +218,20 @@ class _CreatePostSheet extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                _PostTypeButton(icon: HugeIcons.strokeRoundedTextFont, label: 'Text Post', gradient: AppColors.primaryGradient, onTap: () => Navigator.pop(context)),
+                _PostTypeButton(icon: HugeIcons.strokeRoundedTextFont, label: 'Text Post', gradient: AppColors.primaryGradient, onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const CreatePostScreen(postType: 'text')));
+                }),
                 const SizedBox(width: 10),
-                _PostTypeButton(icon: HugeIcons.strokeRoundedImage01, label: 'Photo', gradient: AppColors.warmGradient, onTap: () => Navigator.pop(context)),
+                _PostTypeButton(icon: HugeIcons.strokeRoundedImage01, label: 'Photo', gradient: AppColors.warmGradient, onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const CreatePostScreen(postType: 'photo')));
+                }),
                 const SizedBox(width: 10),
-                _PostTypeButton(icon: HugeIcons.strokeRoundedVideo01, label: 'Video', gradient: AppColors.cyanGradient, onTap: () => Navigator.pop(context)),
+                _PostTypeButton(icon: HugeIcons.strokeRoundedVideo01, label: 'Video', gradient: AppColors.cyanGradient, onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(builder: (_) => const CreatePostScreen(postType: 'video')));
+                }),
                 const SizedBox(width: 10),
                 _PostTypeButton(
                   icon: HugeIcons.strokeRoundedUserStory,

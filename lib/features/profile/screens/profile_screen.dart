@@ -257,8 +257,9 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
                               child: _uploadingPhoto
                                   ? const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                                   : user?.profilePhoto != null
-                                      ? ClipOval(child: Image.network(user!.profilePhoto!, fit: BoxFit.cover))
-                                      : const Center(child: Text('🎉', style: TextStyle(fontSize: 34))),
+                                      ? ClipOval(child: Image.network(user!.profilePhoto!, fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 34, color: Colors.white))))
+                                      : const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 34, color: Colors.white)),
                             ),
                             // Camera overlay
                             Positioned(

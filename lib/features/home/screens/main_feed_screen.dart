@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/gradient_text.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../feed/screens/create_post_screen.dart';
 import '../../feed/widgets/story_row.dart';
 import '../../feed/widgets/feed_post_card.dart';
 
@@ -27,14 +30,14 @@ const _statusFontStyles = [
   TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
 ];
 
-class MainFeedScreen extends StatefulWidget {
+class MainFeedScreen extends ConsumerStatefulWidget {
   const MainFeedScreen({super.key});
 
   @override
-  State<MainFeedScreen> createState() => _MainFeedScreenState();
+  ConsumerState<MainFeedScreen> createState() => _MainFeedScreenState();
 }
 
-class _MainFeedScreenState extends State<MainFeedScreen> {
+class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
   final _scrollController = ScrollController();
   String _selectedFilter = 'For You';
   final _filters = ['For You', 'Check-ins', 'DJ Updates', 'Photos', 'Videos', 'Trending'];
@@ -206,6 +209,7 @@ class _MainFeedScreenState extends State<MainFeedScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final me = ref.watch(authProvider).user;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgCardLight,
@@ -249,14 +253,14 @@ class _MainFeedScreenState extends State<MainFeedScreen> {
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(color: AppColors.purple.withOpacity(0.3)),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('⚡', style: TextStyle(fontSize: 11)),
-                    SizedBox(width: 3),
+                    const Text('⚡', style: TextStyle(fontSize: 11)),
+                    const SizedBox(width: 3),
                     Text(
-                      '2,450 XP',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.purple),
+                      '${me?.xpPoints ?? 0} XP',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.purple),
                     ),
                   ],
                 ),
@@ -317,16 +321,22 @@ class _MainFeedScreenState extends State<MainFeedScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
                   child: Row(
                     children: [
+                      // User avatar
                       Container(
-                        width: 38,
-                        height: 38,
+                        width: 38, height: 38,
                         decoration: const BoxDecoration(gradient: AppColors.primaryGradient, shape: BoxShape.circle),
-                        child: const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 20, color: Colors.white)),
+                        child: ClipOval(
+                          child: me?.profilePhoto != null
+                              ? Image.network(me!.profilePhoto!, fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 20, color: Colors.white)))
+                              : const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedUser, size: 20, color: Colors.white)),
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: GestureDetector(
-                          onTap: () {},
+                          onTap: () => Navigator.of(context, rootNavigator: true).push(
+                            MaterialPageRoute(builder: (_) => const CreatePostScreen(postType: 'text'))),
                           child: Container(
                             height: 38,
                             decoration: BoxDecoration(
@@ -347,12 +357,8 @@ class _MainFeedScreenState extends State<MainFeedScreen> {
                       GestureDetector(
                         onTap: _showStatusCreator,
                         child: Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            gradient: AppColors.primaryGradient,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                          width: 38, height: 38,
+                          decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(10)),
                           child: const Center(child: Text('✨', style: TextStyle(fontSize: 18))),
                         ),
                       ),
