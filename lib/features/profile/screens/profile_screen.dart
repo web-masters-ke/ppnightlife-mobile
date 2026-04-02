@@ -1520,6 +1520,7 @@ class _ConnectionsTabState extends ConsumerState<_ConnectionsTab> with SingleTic
       TabBar(
         controller: _tc,
         indicatorColor: AppColors.purple,
+        dividerColor: Colors.transparent,
         labelColor: AppColors.purple,
         unselectedLabelColor: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
         tabs: [
