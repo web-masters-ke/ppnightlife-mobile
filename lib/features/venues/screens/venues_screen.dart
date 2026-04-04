@@ -22,13 +22,10 @@ class _VenuesScreenState extends State<VenuesScreen> {
   bool _searchOpen = false;
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
-  int _selectedFilter = 0;
   int _selectedArea = 0;
   int _selectedType = 0;
   bool _openNow = false;
   bool _sortTrending = false;
-  final _filters = ['Nearby', 'Trending', 'Open Now', 'Clubs', 'Bars', 'Rooftops'];
-
   List<Map<String, dynamic>> _apiVenues = [];
   List<Map<String, dynamic>> _liveDJs = [];
   bool _loadingVenues = false;
@@ -61,9 +58,46 @@ class _VenuesScreenState extends State<VenuesScreen> {
   Future<void> _loadLiveDJs() async {
     try {
       final res = await ApiService().getLiveDJs();
-      final data = res.data['data'];
-      final items = ((data is List ? data : data?['items']) as List? ?? []).cast<Map<String, dynamic>>();
-      if (mounted) setState(() => _liveDJs = items);
+      final body = res.data['data'] ?? res.data;
+      // Backend returns { live: [...], count } — not items
+      final raw = ((body['live'] as List?) ??
+              (body is List ? body : body?['items'] as List?) ??
+              [])
+          .cast<Map<String, dynamic>>();
+
+      // Enrich each live set with user profile + venue name
+      final enriched = await Future.wait(raw.map((set) async {
+        final djId = set['djId'] as String? ?? set['dj_id'] as String? ?? '';
+        final venueId = set['venueId'] as String? ?? set['venue_id'] as String? ?? '';
+        Map<String, dynamic> userInfo = {};
+        Map<String, dynamic> venueInfo = {};
+        try {
+          if (djId.isNotEmpty) {
+            final u = await ApiService().getUser(djId);
+            userInfo = (u.data['data'] ?? u.data) as Map<String, dynamic>? ?? {};
+          }
+        } catch (_) {}
+        try {
+          if (venueId.isNotEmpty) {
+            final v = await ApiService().getVenue(venueId);
+            venueInfo = (v.data['data'] ?? v.data) as Map<String, dynamic>? ?? {};
+          }
+        } catch (_) {}
+        return {
+          ...set,
+          'djId': djId,
+          'venueId': venueId,
+          'djName': userInfo['name'] as String? ?? userInfo['djName'] as String? ?? 'DJ',
+          'name': userInfo['name'] as String? ?? 'DJ',
+          'profilePhoto': userInfo['profilePhoto'] as String?,
+          'venueName': venueInfo['name'] as String? ?? '',
+          'venue': {'venueId': venueId, 'name': venueInfo['name'] as String? ?? ''},
+          'checkinCount': (venueInfo['currentCheckins'] as num?)?.toInt() ?? 0,
+          'nowPlaying': userInfo['nowPlaying'] as String?,
+        };
+      }));
+
+      if (mounted) setState(() => _liveDJs = enriched);
     } catch (_) {}
   }
 
@@ -225,42 +259,6 @@ class _VenuesScreenState extends State<VenuesScreen> {
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.purple)),
                     ]),
                   ],
-                ),
-              ),
-            ),
-          ),
-
-          // ── Type filter chips ──────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 42,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                itemCount: _filters.length,
-                itemBuilder: (context, index) => GestureDetector(
-                  onTap: () => setState(() => _selectedFilter = index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      gradient: _selectedFilter == index ? AppColors.primaryGradient : null,
-                      color: _selectedFilter == index ? null
-                          : isDark ? AppColors.bgElevatedDark : AppColors.bgElevatedLight,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: _selectedFilter == index ? Colors.transparent
-                            : isDark ? AppColors.borderDark : AppColors.borderLight,
-                      ),
-                    ),
-                    child: Text(_filters[index], style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: _selectedFilter == index ? FontWeight.w600 : FontWeight.w400,
-                      color: _selectedFilter == index ? Colors.white
-                          : isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    )),
-                  ),
                 ),
               ),
             ),

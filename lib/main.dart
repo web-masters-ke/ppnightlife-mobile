@@ -18,8 +18,18 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Edge-to-edge — per-screen AnnotatedRegion handles icon brightness
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // Show status bar and navigation bar with opaque backgrounds
+  SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.manual,
+    overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+  );
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Color(0xFF0D0D14),
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
+    systemNavigationBarColor: Color(0xFF0D0D14),
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
 
   runApp(const ProviderScope(child: PartyPeopleApp()));
 }

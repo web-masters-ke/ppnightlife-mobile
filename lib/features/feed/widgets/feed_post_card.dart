@@ -327,26 +327,28 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
             ),
           ),
 
-          const SizedBox(height: 10),
-
           // Content
-          GestureDetector(
-            onTap: _openPostDetail,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Text(
-                post.content as String,
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.5,
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+          if ((post.content as String).isNotEmpty) ...[
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: _openPostDetail,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Text(
+                  post.content as String,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.5,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
 
           // Media (images or video)
           if ((post.isImage as bool) || (post.isVideo as bool)) ...[
+            if ((post.content as String).isNotEmpty) const SizedBox(height: 10),
             const SizedBox(height: 10),
             _PostMediaGrid(
               urls: (() {
@@ -650,8 +652,8 @@ class _FeedVideoPlayerState extends State<_FeedVideoPlayer> {
             if (!c.value.isPlaying)
               Container(
                 decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
-                padding: const EdgeInsets.all(8),
-                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 26),
+                padding: const EdgeInsets.all(12),
+                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 40),
               ),
             // Mute toggle — bottom right corner
             Positioned(
@@ -687,9 +689,72 @@ class _FeedVideoPlayerState extends State<_FeedVideoPlayer> {
   }
 }
 
+// ── Adaptive single image — resolves natural dimensions, clamps ratio ────────
+class _AdaptiveImage extends StatefulWidget {
+  final String url;
+  final double width;
+  const _AdaptiveImage({required this.url, required this.width});
+
+  @override
+  State<_AdaptiveImage> createState() => _AdaptiveImageState();
+}
+
+class _AdaptiveImageState extends State<_AdaptiveImage> {
+  double? _aspectRatio; // width / height
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveAspectRatio();
+  }
+
+  void _resolveAspectRatio() {
+    final image = NetworkImage(widget.url);
+    final stream = image.resolve(ImageConfiguration.empty);
+    final listener = ImageStreamListener((info, _) {
+      if (mounted) {
+        final w = info.image.width.toDouble();
+        final h = info.image.height.toDouble();
+        if (w > 0 && h > 0) setState(() => _aspectRatio = w / h);
+      }
+    }, onError: (_, __) {
+      if (mounted) setState(() => _aspectRatio = 4 / 5); // fallback
+    });
+    stream.addListener(listener);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Clamp: min square (1:1 = ratio 1.0), max portrait (4:5 = ratio 0.8)
+    final ratio = (_aspectRatio ?? 0.9).clamp(0.8, 1.91);
+    final height = widget.width / ratio;
+    return SizedBox(
+      width: widget.width,
+      height: height,
+      child: CachedNetworkImage(
+        imageUrl: widget.url,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        placeholder: (_, __) => Container(
+          width: widget.width,
+          height: height,
+          color: const Color(0xFF141420),
+        ),
+        errorWidget: (_, __, ___) => Container(
+          width: widget.width,
+          height: height,
+          color: AppColors.purple.withValues(alpha: 0.15),
+          child: const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, size: 40, color: Colors.white38)),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Post Media Grid ───────────────────────────────────────────────────────────
 // Instagram-style: full-width, no horizontal padding, no border radius.
-// Single/video: 4:5 portrait. Multi: square-ish grid with 2px gaps.
+// Single/video: adaptive aspect ratio (min 1:1, max 4:5). Multi: grid with 2px gaps.
 class _PostMediaGrid extends StatelessWidget {
   final List<String> urls;
   final bool isDark;
@@ -712,13 +777,9 @@ class _PostMediaGrid extends StatelessWidget {
 
     final display = urls.take(4).toList();
 
-    // ── Single image — 4:5 portrait, cover, edge-to-edge ────────────────
+    // ── Single image — adaptive aspect ratio ────────────────────────────
     if (display.length == 1) {
-      return SizedBox(
-        width: w,
-        height: w * 5 / 4,
-        child: _img(display.first),
-      );
+      return _AdaptiveImage(url: display.first, width: w);
     }
 
     // ── 2 images — side by side, square each ────────────────────────────
@@ -792,7 +853,7 @@ class _PostMediaGrid extends StatelessWidget {
     fit: BoxFit.cover,
     width: double.infinity,
     height: double.infinity,
-    placeholder: (_, __) => Container(color: Colors.black12),
+    placeholder: (_, __) => Container(color: const Color(0xFF141420)),
     errorWidget: (_, __, ___) => Container(
       color: AppColors.purple.withValues(alpha: 0.15),
       child: const Center(child: HugeIcon(icon: HugeIcons.strokeRoundedImage01, size: 40, color: Colors.white38)),

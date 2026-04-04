@@ -224,6 +224,23 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
     return posts;
   }
 
+  void _showFilterSheet(bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _FeedFilterSheet(
+        isDark: isDark,
+        selected: _selectedFilter,
+        filters: _filters,
+        onSelect: (f) {
+          setState(() => _selectedFilter = f);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -264,7 +281,7 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
                     'PartyPeople',
                     style: const TextStyle(
                       fontFamily: 'PlusJakartaSans',
-                      fontSize: 18,
+                      fontSize: 24,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -293,30 +310,30 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
                   ],
                 ),
               ),
-              // Live indicator
-              Container(
-                margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.red.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppColors.red.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
+              // Filter icon
+              Stack(
+                children: [
+                  IconButton(
+                    icon: HugeIcon(
+                      icon: HugeIcons.strokeRoundedFilterHorizontal,
+                      color: _selectedFilter != 'For You'
+                          ? AppColors.purple
+                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                      size: 22,
                     ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'LIVE',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.red, letterSpacing: 0.5),
+                    onPressed: () => _showFilterSheet(isDark),
+                  ),
+                  if (_selectedFilter != 'For You')
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(color: AppColors.purple, shape: BoxShape.circle),
+                      ),
                     ),
-                  ],
-                ),
+                ],
               ),
               IconButton(
                 icon: HugeIcon(
@@ -341,44 +358,6 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
             slivers: [
               // Stories / Status row
               const SliverToBoxAdapter(child: StoryRow()),
-
-              // Filter chips
-              SliverToBoxAdapter(
-                child: Container(
-                  color: isDark ? AppColors.bgDark : Colors.white,
-                  height: 40,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.fromLTRB(14, 2, 14, 2),
-                    children: _filters.map((f) {
-                      final sel = f == _selectedFilter;
-                      return GestureDetector(
-                        onTap: () => setState(() => _selectedFilter = f),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                          decoration: BoxDecoration(
-                            gradient: sel ? AppColors.primaryGradient : null,
-                            color: sel ? null : (isDark ? AppColors.bgElevatedDark : AppColors.bgElevatedLight),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: sel ? Colors.transparent : (isDark ? AppColors.borderDark : AppColors.borderLight),
-                            ),
-                          ),
-                          child: Text(f,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: sel ? FontWeight.w600 : FontWeight.w400,
-                                color: sel ? Colors.white : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                              )),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-
 
               // Feed posts with leaderboard injected after 5th post
               SliverList(
@@ -763,6 +742,120 @@ class _StatusCreatorSheetState extends State<_StatusCreatorSheet> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── FEED FILTER SHEET ───────────────────────────────────────────────────────
+class _FeedFilterSheet extends StatelessWidget {
+  final bool isDark;
+  final String selected;
+  final List<String> filters;
+  final ValueChanged<String> onSelect;
+
+  const _FeedFilterSheet({
+    required this.isDark,
+    required this.selected,
+    required this.filters,
+    required this.onSelect,
+  });
+
+  static const _icons = {
+    'For You':     '✨',
+    'Check-ins':   '📍',
+    'DJ Updates':  '🎵',
+    'Photos':      '📸',
+    'Videos':      '🎬',
+    'Trending':    '🔥',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final bot = MediaQuery.of(context).padding.bottom;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: EdgeInsets.fromLTRB(0, 0, 0, bot + 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.bgElevatedDark : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Center(
+            child: Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Text('Feed Filter',
+                    style: TextStyle(
+                      fontFamily: 'PlusJakartaSans',
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                    )),
+                const Spacer(),
+                if (selected != 'For You')
+                  GestureDetector(
+                    onTap: () => onSelect('For You'),
+                    child: Text('Reset',
+                        style: TextStyle(fontSize: 13, color: AppColors.purple, fontWeight: FontWeight.w600)),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...filters.map((f) {
+            final isSel = f == selected;
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onSelect(f);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: isSel ? AppColors.primaryGradient : null,
+                  color: isSel ? null : (isDark ? AppColors.bgCardDark : AppColors.bgElevatedLight),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isSel ? Colors.transparent : (isDark ? AppColors.borderDark : AppColors.borderLight),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Text(_icons[f] ?? '•', style: const TextStyle(fontSize: 18)),
+                    const SizedBox(width: 12),
+                    Text(f,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                          color: isSel ? Colors.white : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                        )),
+                    const Spacer(),
+                    if (isSel)
+                      const Icon(Icons.check_rounded, color: Colors.white, size: 18),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
         ],
       ),
     );

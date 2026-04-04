@@ -105,8 +105,9 @@ class _StoryRowState extends ConsumerState<StoryRow> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final me = ref.watch(authProvider).user;
 
-    return SizedBox(
-      height: 134,
+    return Container(
+      height: 118,
+      padding: const EdgeInsets.only(top: 6),
       child: _loading
           ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.purple)))
           : ListView.builder(
