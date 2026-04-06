@@ -47,7 +47,8 @@ class HomeShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final role = ref.watch(authProvider).role;
+    // Normalize role: backend uses hyphens (venue-owner), app may use underscores
+    final role = ref.watch(authProvider).role.replaceAll('-', '_');
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final navBarColor = isDark ? AppColors.bgCardDark : AppColors.bgCardLight;
 

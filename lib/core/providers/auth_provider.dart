@@ -72,7 +72,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final data = res.data['data'] ?? res.data;
       await _storage.saveAccessToken(data['accessToken']);
       if (data['refreshToken'] != null) await _storage.saveRefreshToken(data['refreshToken']);
-      final user = UserModel.fromJson(data['user'] ?? data);
+      // Fetch full profile from /users/me — login response only contains tokens + userRole
+      final meRes = await _api.getMe();
+      final meBody = meRes.data['data'] ?? meRes.data['user'] ?? meRes.data;
+      final user = UserModel.fromJson(meBody);
       await _storage.saveUserId(user.userId);
       await _storage.saveUserRole(user.role);
       await _storage.saveUserName(user.name);
@@ -91,7 +94,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final body = res.data['data'] ?? res.data;
       await _storage.saveAccessToken(body['accessToken']);
       if (body['refreshToken'] != null) await _storage.saveRefreshToken(body['refreshToken']);
-      final user = UserModel.fromJson(body['user'] ?? body);
+      // Fetch full profile from /users/me — register response only contains tokens
+      final meRes = await _api.getMe();
+      final meBody = meRes.data['data'] ?? meRes.data['user'] ?? meRes.data;
+      final user = UserModel.fromJson(meBody);
       await _storage.saveUserId(user.userId);
       await _storage.saveUserRole(user.role);
       await _storage.saveUserName(user.name);
