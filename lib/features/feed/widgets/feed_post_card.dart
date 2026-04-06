@@ -111,7 +111,7 @@ class _FeedPostCardState extends State<FeedPostCard> with TickerProviderStateMix
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 1),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.bgDark : AppColors.bgLight,
+        color: isDark ? AppColors.bgDark : AppColors.bgCardLight,
         border: Border(
           bottom: BorderSide(
             color: isDark ? AppColors.borderDark : AppColors.borderLight,
