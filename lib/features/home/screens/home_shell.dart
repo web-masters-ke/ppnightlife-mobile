@@ -58,7 +58,7 @@ class HomeShell extends ConsumerWidget {
         navBarColor: navBarColor,
         body: const DJScreen(),
         navItems: _buildDJNav(context, isDark),
-        fabIcon: HugeIcons.strokeRoundedMicrophoneCircle01,
+        fabIcon: HugeIcons.strokeRoundedRadio,
         fabLabel: 'Go Live',
         onFabTap: () => _showGoLiveSheet(context),
       );
@@ -166,7 +166,7 @@ class HomeShell extends ConsumerWidget {
     return [
       _SimpleNavItem(icon: HugeIcons.strokeRoundedDashboardCircle, label: 'Dashboard', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
       _SimpleNavItem(icon: HugeIcons.strokeRoundedCalendar01, label: 'Events', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedDj, label: 'DJs', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
+      _SimpleNavItem(icon: HugeIcons.strokeRoundedRecord, label: 'DJs', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
       _SimpleNavItem(icon: HugeIcons.strokeRoundedUser, label: 'Profile', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
     ];
   }
@@ -174,7 +174,7 @@ class HomeShell extends ConsumerWidget {
   List<Widget> _buildAdvertiserNav(BuildContext context, bool isDark) {
     return [
       _SimpleNavItem(icon: HugeIcons.strokeRoundedDashboardCircle, label: 'Overview', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedAd01, label: 'Campaigns', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
+      _SimpleNavItem(icon: HugeIcons.strokeRoundedMegaphone01, label: 'Campaigns', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
       _SimpleNavItem(icon: HugeIcons.strokeRoundedAnalytics01, label: 'Analytics', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
       _SimpleNavItem(icon: HugeIcons.strokeRoundedUser, label: 'Profile', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
     ];
