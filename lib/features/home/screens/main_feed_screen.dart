@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/gradient_text.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../feed/widgets/story_row.dart';
@@ -244,7 +242,6 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final me = ref.watch(authProvider).user;
 
     // When auth finishes loading and user is authenticated, load feed if not done yet
     ref.listen(authProvider, (prev, next) {
@@ -260,93 +257,7 @@ class _MainFeedScreenState extends ConsumerState<MainFeedScreen> {
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgCardLight,
       body: NestedScrollView(
         controller: _scrollController,
-        headerSliverBuilder: (context, innerBoxScrolled) => [
-          SliverAppBar(
-            floating: true,
-            snap: true,
-            backgroundColor: isDark ? AppColors.bgDark : AppColors.bgCardLight,
-            surfaceTintColor: Colors.transparent,
-            shadowColor: isDark ? Colors.transparent : Colors.black.withOpacity(0.06),
-            elevation: 0,
-            scrolledUnderElevation: isDark ? 0 : 1,
-            forceElevated: !isDark,
-            titleSpacing: 16,
-            title: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset('assets/images/logo.png', width: 32, height: 32),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: GradientText(
-                    'PartyPeople',
-                    style: const TextStyle(
-                      fontFamily: 'PlusJakartaSans',
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              // XP indicator
-              Container(
-                margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.purple.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppColors.purple.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('⚡', style: TextStyle(fontSize: 11)),
-                    const SizedBox(width: 3),
-                    Text(
-                      '${me?.xpPoints ?? 0} XP',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.purple),
-                    ),
-                  ],
-                ),
-              ),
-              // Filter icon
-              Stack(
-                children: [
-                  IconButton(
-                    icon: HugeIcon(
-                      icon: HugeIcons.strokeRoundedFilterHorizontal,
-                      color: _selectedFilter != 'For You'
-                          ? AppColors.purple
-                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                      size: 22,
-                    ),
-                    onPressed: () => _showFilterSheet(isDark),
-                  ),
-                  if (_selectedFilter != 'For You')
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(color: AppColors.purple, shape: BoxShape.circle),
-                      ),
-                    ),
-                ],
-              ),
-              IconButton(
-                icon: HugeIcon(
-                  icon: HugeIcons.strokeRoundedNotification01,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  size: 22,
-                ),
-                onPressed: () => context.push('/notifications'),
-              ),
-              const SizedBox(width: 4),
-            ],
-          ),
-        ],
+        headerSliverBuilder: (context, innerBoxScrolled) => [],
         body: RefreshIndicator(
           color: AppColors.purple,
           backgroundColor: isDark ? AppColors.bgCardDark : AppColors.bgCardLight,

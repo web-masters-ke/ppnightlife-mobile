@@ -52,7 +52,7 @@ class HomeShell extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final navBarColor = isDark ? AppColors.bgCardDark : AppColors.bgCardLight;
 
-    // Role-specific shells
+    // Role-specific shells — these keep their own bottom nav
     if (role == 'dj') {
       return _RoleShell(
         isDark: isDark,
@@ -60,7 +60,6 @@ class HomeShell extends ConsumerWidget {
         body: const DJScreen(),
         navItems: _buildDJNav(context, isDark),
         fabIcon: HugeIcons.strokeRoundedRadio,
-        fabLabel: 'Go Live',
         onFabTap: () => _showGoLiveSheet(context),
       );
     }
@@ -72,7 +71,6 @@ class HomeShell extends ConsumerWidget {
         body: const MerchantScreen(),
         navItems: _buildMerchantNav(context, isDark),
         fabIcon: HugeIcons.strokeRoundedAdd01,
-        fabLabel: 'Add',
         onFabTap: () => _showCreatePost(context),
       );
     }
@@ -84,100 +82,66 @@ class HomeShell extends ConsumerWidget {
         body: const AdvertiserScreen(),
         navItems: _buildAdvertiserNav(context, isDark),
         fabIcon: HugeIcons.strokeRoundedAdd01,
-        fabLabel: 'Campaign',
         onFabTap: () => _showCreatePost(context),
       );
     }
 
-    // Default: party_goer / guest shell
+    // Default: party_goer / guest — Facebook-style top nav
     final location = GoRouterState.of(context).uri.toString();
     final currentIndex = _locationToIndex(location);
     final unread = ref.watch(_unreadCountProvider).valueOrNull ?? 0;
+    final barColor = isDark ? AppColors.bgCardDark : Colors.white;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-        systemNavigationBarColor: navBarColor,
+        systemNavigationBarColor: isDark ? AppColors.bgDark : AppColors.bgLight,
         systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         systemNavigationBarDividerColor: Colors.transparent,
         systemNavigationBarContrastEnforced: false,
       ),
       child: Scaffold(
         backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
-        body: child,
-        bottomNavigationBar: ColoredBox(
-          color: navBarColor,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(height: 0.5, color: isDark ? AppColors.borderDark : AppColors.borderLight),
-              SafeArea(
-                top: false,
-                child: SizedBox(
-                  height: 58,
-                  child: Row(
-                    children: [
-                      _NavItem(icon: HugeIcons.strokeRoundedHome01, activeIcon: HugeIcons.strokeRoundedHome09, label: 'Home', index: 0, currentIndex: currentIndex, onTap: () => _onNavTap(context, 0), isDark: isDark),
-                      _NavItem(icon: HugeIcons.strokeRoundedLocation01, activeIcon: HugeIcons.strokeRoundedLocation04, label: 'Venues', index: 1, currentIndex: currentIndex, onTap: () => _onNavTap(context, 1), isDark: isDark),
-                      // Center post button
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _showCreatePost(context),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 44, height: 44,
-                                decoration: const BoxDecoration(
-                                  gradient: AppColors.primaryGradient,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [BoxShadow(color: Color(0x556C5CE7), blurRadius: 12, offset: Offset(0, 4))],
-                                ),
-                                child: const HugeIcon(icon: HugeIcons.strokeRoundedAdd01, size: 24, color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      _NavItem(icon: HugeIcons.strokeRoundedMessage01, activeIcon: HugeIcons.strokeRoundedMessage02, label: 'Chat', index: 2, currentIndex: currentIndex, onTap: () => _onNavTap(context, 2), isDark: isDark, badge: unread),
-                      _NavItem(icon: HugeIcons.strokeRoundedUser, activeIcon: HugeIcons.strokeRoundedUserCircle, label: 'Profile', index: 4, currentIndex: currentIndex, onTap: () => _onNavTap(context, 4), isDark: isDark),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+        // Facebook-style: nav tabs live in the app bar, no bottom nav
+        appBar: _TopNavBar(
+          isDark: isDark,
+          barColor: barColor,
+          currentIndex: currentIndex,
+          unread: unread,
+          onNavTap: (i) => _onNavTap(context, i),
+          onCreateTap: () => _showCreatePost(context),
         ),
+        body: child,
       ),
     );
   }
 
-  List<Widget> _buildDJNav(BuildContext context, bool isDark) {
+  List<_RoleNavDef> _buildDJNav(BuildContext context, bool isDark) {
     return [
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedHome01, label: 'Feed', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedMusicNote01, label: 'Live Set', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedAlbum01, label: 'Queue', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedUser, label: 'Profile', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedHome01, label: 'Feed', onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedMusicNote01, label: 'Live Set', onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedAlbum01, label: 'Queue', onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedUser, label: 'Profile', onTap: () => HapticFeedback.selectionClick()),
     ];
   }
 
-  List<Widget> _buildMerchantNav(BuildContext context, bool isDark) {
+  List<_RoleNavDef> _buildMerchantNav(BuildContext context, bool isDark) {
     return [
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedDashboardCircle, label: 'Dashboard', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedCalendar01, label: 'Events', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedRecord, label: 'DJs', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedUser, label: 'Profile', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedDashboardCircle, label: 'Dashboard', onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedCalendar01, label: 'Events', onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedRecord, label: 'DJs', onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedUser, label: 'Profile', onTap: () => HapticFeedback.selectionClick()),
     ];
   }
 
-  List<Widget> _buildAdvertiserNav(BuildContext context, bool isDark) {
+  List<_RoleNavDef> _buildAdvertiserNav(BuildContext context, bool isDark) {
     return [
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedDashboardCircle, label: 'Overview', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedMegaphone01, label: 'Campaigns', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedAnalytics01, label: 'Analytics', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
-      _SimpleNavItem(icon: HugeIcons.strokeRoundedUser, label: 'Profile', isDark: isDark, onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedDashboardCircle, label: 'Overview', onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedMegaphone01, label: 'Campaigns', onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedAnalytics01, label: 'Analytics', onTap: () => HapticFeedback.selectionClick()),
+      _RoleNavDef(icon: HugeIcons.strokeRoundedUser, label: 'Profile', onTap: () => HapticFeedback.selectionClick()),
     ];
   }
 
@@ -200,70 +164,245 @@ class HomeShell extends ConsumerWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
+// ─── Facebook-style top nav bar ───────────────────────────────────────────────
+
+class _TopNavBar extends StatelessWidget implements PreferredSizeWidget {
+  final bool isDark;
+  final Color barColor;
+  final int currentIndex;
+  final int unread;
+  final ValueChanged<int> onNavTap;
+  final VoidCallback onCreateTap;
+
+  const _TopNavBar({
+    required this.isDark,
+    required this.barColor,
+    required this.currentIndex,
+    required this.unread,
+    required this.onNavTap,
+    required this.onCreateTap,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 46);
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
+    final mutedColor = isDark ? AppColors.textMutedDark : const Color(0xFF65676B);
+
+    return Container(
+      color: barColor,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Row 1: Logo + action icons ────────────────────────────────────
+          SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: kToolbarHeight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    // Logo wordmark
+                    ShaderMask(
+                      shaderCallback: (r) => AppColors.primaryGradient.createShader(r),
+                      child: const Text(
+                        'PartyPeople',
+                        style: TextStyle(
+                          fontFamily: 'PlusJakartaSans',
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    // Search button
+                    _ActionBtn(
+                      icon: HugeIcons.strokeRoundedSearch01,
+                      isDark: isDark,
+                      onTap: () {},
+                    ),
+                    const SizedBox(width: 8),
+                    // Create post button
+                    _ActionBtn(
+                      icon: HugeIcons.strokeRoundedAdd01,
+                      isDark: isDark,
+                      onTap: onCreateTap,
+                    ),
+                    const SizedBox(width: 8),
+                    // Notifications
+                    _ActionBtn(
+                      icon: HugeIcons.strokeRoundedNotification01,
+                      isDark: isDark,
+                      onTap: () => GoRouter.of(context).push('/notifications'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Row 2: Nav tabs ───────────────────────────────────────────────
+          Container(
+            height: 46,
+            decoration: BoxDecoration(
+              color: barColor,
+              border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
+            ),
+            child: Row(
+              children: [
+                _TabItem(
+                  icon: HugeIcons.strokeRoundedHome01,
+                  activeIcon: HugeIcons.strokeRoundedHome09,
+                  index: 0,
+                  currentIndex: currentIndex,
+                  isDark: isDark,
+                  mutedColor: mutedColor,
+                  onTap: () => onNavTap(0),
+                ),
+                _TabItem(
+                  icon: HugeIcons.strokeRoundedLocation01,
+                  activeIcon: HugeIcons.strokeRoundedLocation04,
+                  index: 1,
+                  currentIndex: currentIndex,
+                  isDark: isDark,
+                  mutedColor: mutedColor,
+                  onTap: () => onNavTap(1),
+                ),
+                _TabItem(
+                  icon: HugeIcons.strokeRoundedMessage01,
+                  activeIcon: HugeIcons.strokeRoundedMessage02,
+                  index: 2,
+                  currentIndex: currentIndex,
+                  isDark: isDark,
+                  mutedColor: mutedColor,
+                  onTap: () => onNavTap(2),
+                  badge: unread,
+                ),
+                _TabItem(
+                  icon: HugeIcons.strokeRoundedUser,
+                  activeIcon: HugeIcons.strokeRoundedUserCircle,
+                  index: 4,
+                  currentIndex: currentIndex,
+                  isDark: isDark,
+                  mutedColor: mutedColor,
+                  onTap: () => onNavTap(4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Circular action button (search, create, notifications)
+class _ActionBtn extends StatelessWidget {
+  final List<List<dynamic>> icon;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _ActionBtn({required this.icon, required this.isDark, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.bgElevatedDark : const Color(0xFFE4E6EB),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: HugeIcon(
+            icon: icon,
+            size: 20,
+            color: isDark ? AppColors.textPrimaryDark : const Color(0xFF050505),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Tab icon with active purple underline indicator
+class _TabItem extends StatelessWidget {
   final List<List<dynamic>> icon;
   final List<List<dynamic>> activeIcon;
-  final String label;
   final int index;
   final int currentIndex;
-  final VoidCallback onTap;
   final bool isDark;
+  final Color mutedColor;
+  final VoidCallback onTap;
   final int? badge;
 
-  const _NavItem({
+  const _TabItem({
     required this.icon,
     required this.activeIcon,
-    required this.label,
     required this.index,
     required this.currentIndex,
-    required this.onTap,
     required this.isDark,
+    required this.mutedColor,
+    required this.onTap,
     this.badge,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isSelected = currentIndex == index;
-    final iconColor = isSelected ? AppColors.purple : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight);
+    final isActive = currentIndex == index;
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
+            // Active underline at bottom
+            if (isActive)
+              Positioned(
+                bottom: 0,
+                left: 16,
+                right: 16,
+                child: Container(
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: AppColors.purple,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            // Icon
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: HugeIcon(icon: isSelected ? activeIcon : icon, size: 22, color: iconColor),
+                HugeIcon(
+                  icon: isActive ? activeIcon : icon,
+                  size: 24,
+                  color: isActive ? AppColors.purple : mutedColor,
                 ),
                 if (badge != null && badge! > 0)
                   Positioned(
-                    top: 2, right: 2,
+                    top: -4,
+                    right: -6,
                     child: Container(
-                      width: 16, height: 16,
-                      decoration: const BoxDecoration(color: AppColors.pink, shape: BoxShape.circle),
-                      child: Center(
-                        child: Text(
-                          badge! > 9 ? '9+' : '$badge',
-                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
-                        ),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: const BoxDecoration(
+                        color: AppColors.pink,
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                      child: Text(
+                        badge! > 99 ? '99+' : '$badge',
+                        style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
                       ),
                     ),
                   ),
               ],
-            ),
-            const SizedBox(height: 2),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? AppColors.purple : (isDark ? AppColors.textMutedDark : AppColors.textMutedLight),
-              ),
-              child: Text(label),
             ),
           ],
         ),
@@ -271,6 +410,8 @@ class _NavItem extends StatelessWidget {
     );
   }
 }
+
+// ─── _NavItem — kept for any future use ──────────────────────────────────────
 
 class _CreatePostSheet extends StatelessWidget {
   @override
@@ -347,7 +488,7 @@ class _PostTypeButton extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: gradient,
                 borderRadius: BorderRadius.circular(14),
-                boxShadow: [BoxShadow(color: (gradient as LinearGradient).colors.first.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: [BoxShadow(color: (gradient as LinearGradient).colors.first.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
               ),
               child: Center(child: HugeIcon(icon: icon, color: Colors.white, size: 24)),
             ),
@@ -364,15 +505,21 @@ class _PostTypeButton extends StatelessWidget {
   }
 }
 
-// ─── Role shell: wraps a role-specific screen with custom bottom nav ───────────
+// ─── Role shell: wraps a role-specific screen with custom bottom nav ──────────
+
+class _RoleNavDef {
+  final List<List<dynamic>> icon;
+  final String label;
+  final VoidCallback onTap;
+  const _RoleNavDef({required this.icon, required this.label, required this.onTap});
+}
 
 class _RoleShell extends StatelessWidget {
   final bool isDark;
   final Color navBarColor;
   final Widget body;
-  final List<Widget> navItems;
+  final List<_RoleNavDef> navItems;
   final List<List<dynamic>> fabIcon;
-  final String fabLabel;
   final VoidCallback onFabTap;
 
   const _RoleShell({
@@ -381,7 +528,6 @@ class _RoleShell extends StatelessWidget {
     required this.body,
     required this.navItems,
     required this.fabIcon,
-    required this.fabLabel,
     required this.onFabTap,
   });
 
@@ -412,7 +558,7 @@ class _RoleShell extends StatelessWidget {
                   height: 58,
                   child: Row(
                     children: [
-                      ...navItems.take(navItems.length ~/ 2),
+                      ...navItems.take(navItems.length ~/ 2).map((n) => _SimpleNavItem(icon: n.icon, label: n.label, isDark: isDark, onTap: n.onTap)),
                       // Center FAB
                       Expanded(
                         child: GestureDetector(
@@ -433,7 +579,7 @@ class _RoleShell extends StatelessWidget {
                           ),
                         ),
                       ),
-                      ...navItems.skip(navItems.length ~/ 2),
+                      ...navItems.skip(navItems.length ~/ 2).map((n) => _SimpleNavItem(icon: n.icon, label: n.label, isDark: isDark, onTap: n.onTap)),
                     ],
                   ),
                 ),
